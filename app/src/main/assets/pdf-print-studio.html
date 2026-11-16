@@ -1,0 +1,2264 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>PrintStudio Pro — True Desktop Page Reflow & PDF Engine</title>
+
+  <!-- Core PDF & Office Parsing Libraries (async so offline/slow network never blocks DOMContentLoaded or UI render) -->
+  <script async src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <script async src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script async src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+  <script async src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script async src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script async src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <style>
+    :root {
+      --slate-bg: #0F172A;
+      --slate-card: #1E293B;
+      --slate-hover: #283548;
+      --slate-border: #334155;
+      --lime-accent: #DFFF5E;
+      --lime-dark: #C2E538;
+      --sky-accent: #38BDF8;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      height: 100%;
+      width: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background-color: #0F172A;
+      color: #F8FAFC;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif;
+      overscroll-behavior-y: none;
+    }
+
+    button, input, label {
+      font-family: inherit;
+    }
+
+    button {
+      background: transparent;
+      border: 0;
+      color: inherit;
+      cursor: pointer;
+    }
+
+    svg {
+      display: block;
+      flex-shrink: 0;
+    }
+
+    /* Core Layout Shell */
+    body {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    main {
+      flex: 1 1 0%;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    main > section {
+      flex: 1 1 52%;
+      min-height: 200px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      border-bottom: 1px solid #334155;
+      overflow: hidden;
+    }
+
+    main > aside {
+      width: 100%;
+      flex: 0 0 48%;
+      min-height: 240px;
+      max-height: 55%;
+      background-color: #0F172A;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    @media (min-width: 1024px) {
+      main {
+        flex-direction: row;
+      }
+      main > section {
+        flex: 1 1 0%;
+        min-height: 0;
+        border-bottom: 0;
+        border-right: 1px solid #334155;
+        min-width: 0;
+      }
+      main > aside {
+        width: 440px;
+        flex: 0 0 440px;
+        height: 100%;
+        max-height: none;
+      }
+    }
+
+    @media (min-width: 1280px) {
+      main > aside {
+        width: 460px;
+        flex: 0 0 460px;
+      }
+    }
+
+    /* Utility Classes (Self-Contained Offline Styling) */
+    .hidden { display: none !important; }
+    .block { display: block; }
+    .inline-block { display: inline-block; }
+    .flex { display: flex; }
+    .flex-col { flex-direction: column; }
+    .flex-wrap { flex-wrap: wrap; }
+    .flex-1 { flex: 1 1 0%; }
+    .shrink-0 { flex-shrink: 0; }
+    .items-center { align-items: center; }
+    .justify-between { justify-content: space-between; }
+    .justify-center { justify-content: center; }
+
+    .grid { display: grid; }
+    .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+    .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+    .gap-1 { gap: 0.25rem; }
+    .gap-1\.5 { gap: 0.375rem; }
+    .gap-2 { gap: 0.5rem; }
+    .gap-2\.5 { gap: 0.625rem; }
+    .gap-3 { gap: 0.75rem; }
+    .gap-6 { gap: 1.5rem; }
+
+    .relative { position: relative; }
+    .sticky { position: sticky; }
+    .fixed { position: fixed; }
+    .absolute { position: absolute; }
+    .inset-0 { top: 0; right: 0; bottom: 0; left: 0; }
+    .top-0 { top: 0; }
+    .top-16 { top: 4rem; }
+    .left-1\/2 { left: 50%; }
+    .-translate-x-1\/2 { transform: translateX(-50%); }
+    .translate-y-0 { transform: translate(-50%, 0); }
+    .translate-y-\[-10px\] { transform: translate(-50%, -10px); }
+    .z-10 { z-index: 10; }
+    .z-20 { z-index: 20; }
+    .z-30 { z-index: 30; }
+    .z-50 { z-index: 50; }
+
+    .min-w-0 { min-width: 0; }
+    .min-h-0 { min-height: 0; }
+    .w-full { width: 100%; }
+    .w-\[92\%\] { width: 92%; }
+    .max-w-md { max-width: 28rem; }
+    .w-1\.5 { width: 0.375rem; }
+    .h-1\.5 { height: 0.375rem; }
+    .w-2\.5 { width: 0.625rem; }
+    .h-2\.5 { height: 0.625rem; }
+    .w-3\.5 { width: 0.875rem; }
+    .h-3\.5 { height: 0.875rem; }
+    .w-4 { width: 1rem; }
+    .h-4 { height: 1rem; }
+    .w-5 { width: 1.25rem; }
+    .h-5 { height: 1.25rem; }
+    .w-8 { width: 2rem; }
+    .h-8 { height: 2rem; }
+    .w-9 { width: 2.25rem; }
+    .h-9 { height: 2.25rem; }
+    .w-10 { width: 2.5rem; }
+    .h-10 { height: 2.5rem; }
+    .w-16 { width: 4rem; }
+
+    .p-0\.5 { padding: 0.125rem; }
+    .p-2 { padding: 0.5rem; }
+    .p-2\.5 { padding: 0.625rem; }
+    .p-3\.5 { padding: 0.875rem; }
+    .p-4 { padding: 1rem; }
+    .px-1 { padding-left: 0.25rem; padding-right: 0.25rem; }
+    .px-1\.5 { padding-left: 0.375rem; padding-right: 0.375rem; }
+    .px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
+    .px-2\.5 { padding-left: 0.625rem; padding-right: 0.625rem; }
+    .px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
+    .px-3\.5 { padding-left: 0.875rem; padding-right: 0.875rem; }
+    .px-4 { padding-left: 1rem; padding-right: 1rem; }
+    .py-0\.5 { padding-top: 0.125rem; padding-bottom: 0.125rem; }
+    .py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+    .py-1\.5 { padding-top: 0.375rem; padding-bottom: 0.375rem; }
+    .py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+    .py-3 { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+    .pt-2 { padding-top: 0.5rem; }
+    .pt-2\.5 { padding-top: 0.625rem; }
+    .mb-1 { margin-bottom: 0.25rem; }
+
+    .space-y-1 > :not([hidden]) ~ :not([hidden]) { margin-top: 0.25rem; }
+    .space-y-1\.5 > :not([hidden]) ~ :not([hidden]) { margin-top: 0.375rem; }
+    .space-y-2\.5 > :not([hidden]) ~ :not([hidden]) { margin-top: 0.625rem; }
+    .space-y-3 > :not([hidden]) ~ :not([hidden]) { margin-top: 0.75rem; }
+    .space-y-3\.5 > :not([hidden]) ~ :not([hidden]) { margin-top: 0.875rem; }
+
+    .overflow-hidden { overflow: hidden; }
+    .overflow-x-hidden { overflow-x: hidden; }
+    .overflow-y-auto { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    .overflow-x-auto { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .scroll-smooth { scroll-behavior: smooth; }
+
+    .bg-slateBg { background-color: #0F172A; }
+    .bg-slateBg\/95 { background-color: rgba(15, 23, 42, 0.95); }
+    .bg-slateBg\/90 { background-color: rgba(15, 23, 42, 0.90); }
+    .bg-slateBg\/85 { background-color: rgba(15, 23, 42, 0.85); }
+    .bg-slateBg\/60 { background-color: rgba(15, 23, 42, 0.60); }
+    .bg-slateCard { background-color: #1E293B; }
+    .bg-slateHover, .hover\:bg-slateHover:hover { background-color: #283548; }
+    .bg-limeAccent { background-color: #DFFF5E; }
+    .hover\:bg-limeDark:hover { background-color: #C2E538; }
+    .hover\:bg-limeAccent:hover { background-color: #DFFF5E; }
+    .bg-limeAccent\/10 { background-color: rgba(223, 255, 94, 0.10); }
+    .bg-limeAccent\/15 { background-color: rgba(223, 255, 94, 0.15); }
+    .bg-skyAccent\/15 { background-color: rgba(56, 189, 248, 0.15); }
+
+    .text-white, .hover\:text-white:hover { color: #FFFFFF; }
+    .text-slate-100 { color: #F1F5F9; }
+    .text-slate-200 { color: #E2E8F0; }
+    .text-slate-300 { color: #CBD5E1; }
+    .text-slate-400 { color: #94A3B8; }
+    .text-slateBg, .hover\:text-slateBg:hover { color: #0F172A; }
+    .text-limeAccent { color: #DFFF5E; }
+    .text-skyAccent { color: #38BDF8; }
+
+    .border { border-width: 1px; border-style: solid; border-color: #334155; }
+    .border-2 { border-width: 2px; border-style: solid; }
+    .border-4 { border-width: 4px; border-style: solid; }
+    .border-b { border-bottom-width: 1px; border-bottom-style: solid; border-color: #334155; }
+    .border-t { border-top-width: 1px; border-top-style: solid; border-color: #334155; }
+    .border-x { border-left-width: 1px; border-right-width: 1px; border-left-style: solid; border-right-style: solid; border-color: #334155; }
+    .border-slateBorder { border-color: #334155; }
+    .border-slateBorder\/80 { border-color: rgba(51, 65, 85, 0.8); }
+    .border-limeAccent { border-color: #DFFF5E; }
+    .border-limeAccent\/40 { border-color: rgba(223, 255, 94, 0.4); }
+    .border-skyAccent\/30 { border-color: rgba(56, 189, 248, 0.3); }
+    .border-t-limeAccent { border-top-color: #DFFF5E; }
+    .border-current { border-color: currentColor; }
+    .focus\:border-limeAccent:focus { border-color: #DFFF5E; }
+
+    .rounded { border-radius: 0.25rem; }
+    .rounded-\[2px\] { border-radius: 2px; }
+    .rounded-md { border-radius: 0.375rem; }
+    .rounded-lg { border-radius: 0.5rem; }
+    .rounded-xl { border-radius: 0.75rem; }
+    .rounded-2xl { border-radius: 1rem; }
+    .rounded-full { border-radius: 9999px; }
+
+    .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    .font-bold { font-weight: 700; }
+    .font-semibold { font-weight: 600; }
+    .font-medium { font-weight: 500; }
+    .text-\[10px\] { font-size: 10px; line-height: 1.3; }
+    .text-\[11px\] { font-size: 11px; line-height: 1.35; }
+    .text-xs { font-size: 0.75rem; line-height: 1rem; }
+    .text-sm { font-size: 0.875rem; line-height: 1.25rem; }
+    .tracking-tight { letter-spacing: -0.025em; }
+    .tracking-wider { letter-spacing: 0.05em; }
+    .uppercase { text-transform: uppercase; }
+    .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .text-left { text-align: left; }
+    .text-center { text-align: center; }
+    .text-right { text-align: right; }
+
+    .shadow-2xl { box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+    .shadow-\[0_0_16px_rgba\(223\,255\,94\,0\.3\)\] { box-shadow: 0 0 16px rgba(223, 255, 94, 0.3); }
+    .shadow-\[0_0_20px_rgba\(223\,255\,94\,0\.22\)\] { box-shadow: 0 0 20px rgba(223, 255, 94, 0.22); }
+    /* Opaque fallback backgrounds instead of backdrop-filter to prevent WebView SwiftShader black surface rendering */
+    .backdrop-blur-md { background-color: #0F172A; }
+    .backdrop-blur-sm { background-color: rgba(15, 23, 42, 0.92); }
+    .transition { transition: all 0.15s ease; }
+    .transition-all { transition: all 0.25s ease; }
+    .duration-300 { transition-duration: 300ms; }
+    .active\:scale-95:active { transform: scale(0.95); }
+    .cursor-pointer { cursor: pointer; }
+    .pointer-events-none { pointer-events: none; }
+    .outline-none { outline: none; }
+    .opacity-0 { opacity: 0; }
+    .opacity-40 { opacity: 0.4; }
+    .opacity-100 { opacity: 1; }
+    .accent-\[\#DFFF5E\] { accent-color: #DFFF5E; }
+
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    .animate-pulse { animation: pulse 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+    .animate-spin { animation: spin 0.9s linear infinite; }
+
+    @media (min-width: 640px) {
+      .sm\:flex-row { flex-direction: row; }
+      .sm\:inline { display: inline; }
+      .sm\:inline-block { display: inline-block; }
+      .sm\:w-9 { width: 2.25rem; }
+      .sm\:h-9 { height: 2.25rem; }
+      .sm\:px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
+      .sm\:px-3\.5 { padding-left: 0.875rem; padding-right: 0.875rem; }
+      .sm\:px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }
+      .sm\:p-4 { padding: 1rem; }
+      .sm\:p-8 { padding: 2rem; }
+      .sm\:gap-2 { gap: 0.5rem; }
+      .sm\:text-sm { font-size: 0.875rem; line-height: 1.25rem; }
+      .sm\:text-base { font-size: 1rem; line-height: 1.5rem; }
+    }
+
+    @media (min-width: 768px) {
+      .md\:flex { display: flex; }
+      .md\:hidden { display: none; }
+    }
+
+    /* Custom Range Sliders */
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+      cursor: pointer;
+      width: 100%;
+      height: 24px;
+    }
+    input[type="range"]::-webkit-slider-runnable-track {
+      height: 6px;
+      border-radius: 999px;
+      background: #334155;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 20px;
+      width: 20px;
+      border-radius: 50%;
+      background: #DFFF5E;
+      margin-top: -7px;
+      box-shadow: 0 0 12px rgba(223, 255, 94, 0.5);
+      border: 2px solid #0F172A;
+    }
+    input[type="range"]::-moz-range-track {
+      height: 6px;
+      border-radius: 999px;
+      background: #334155;
+    }
+    input[type="range"]::-moz-range-thumb {
+      height: 20px;
+      width: 20px;
+      border-radius: 50%;
+      background: #DFFF5E;
+      box-shadow: 0 0 12px rgba(223, 255, 94, 0.5);
+      border: 2px solid #0F172A;
+    }
+
+    /* Blueprint Dot Grid Workspace */
+    .workspace-grid {
+      background-color: #090E1A;
+      background-image: radial-gradient(#1E293B 1.2px, transparent 1.2px);
+      background-size: 20px 20px;
+    }
+
+    /* Crisp Physical Paper Sheet */
+    .physical-sheet {
+      background: #FFFFFF;
+      color: #111827;
+      box-shadow: 0 22px 48px rgba(0, 0, 0, 0.72), 0 0 0 1px rgba(255, 255, 255, 0.12);
+      position: relative;
+      overflow: hidden;
+      flex-shrink: 0;
+      transition: width 0.18s ease, height 0.18s ease;
+    }
+
+    /* Rich Document Flow Typography inside Paper Sheets */
+    .doc-flow-content {
+      font-family: 'Calibri', 'Inter', Arial, sans-serif;
+      color: #111827;
+      line-height: 1.48;
+      font-size: 11pt;
+      transform-origin: top left;
+    }
+    .doc-flow-content h1 {
+      font-size: 16pt;
+      font-weight: 700;
+      color: #0F172A;
+      margin: 0 0 8pt 0;
+      line-height: 1.25;
+      border-bottom: 1.5pt solid #0F172A;
+      padding-bottom: 4pt;
+    }
+    .doc-flow-content h2 {
+      font-size: 13pt;
+      font-weight: 700;
+      color: #1E293B;
+      margin: 10pt 0 5pt 0;
+      line-height: 1.3;
+    }
+    .doc-flow-content h3 {
+      font-size: 11.5pt;
+      font-weight: 700;
+      color: #334155;
+      margin: 8pt 0 4pt 0;
+    }
+    .doc-flow-content p {
+      margin: 0 0 7pt 0;
+      text-align: justify;
+    }
+    .doc-flow-content ul, .doc-flow-content ol {
+      margin: 0 0 8pt 18pt;
+      padding: 0;
+    }
+    .doc-flow-content li {
+      margin-bottom: 3.5pt;
+    }
+    .doc-flow-content table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 6pt 0 8pt 0;
+      font-size: 9.5pt;
+    }
+    .doc-flow-content th {
+      background-color: #F1F5F9;
+      color: #0F172A;
+      font-weight: 700;
+      text-align: left;
+      padding: 5pt 6pt;
+      border: 0.75pt solid #94A3B8;
+    }
+    .doc-flow-content td {
+      padding: 4.5pt 6pt;
+      border: 0.75pt solid #CBD5E1;
+      vertical-align: top;
+    }
+    .doc-flow-content tr:nth-child(even) td {
+      background-color: #F8FAFC;
+    }
+
+    /* Excel Grid Styling */
+    .excel-grid-table {
+      border-collapse: collapse;
+      font-family: 'Calibri', 'Inter', Arial, sans-serif;
+      font-size: 9.5pt;
+      color: #0F172A;
+    }
+    .excel-grid-table th {
+      background-color: #E2E8F0;
+      color: #0F172A;
+      font-weight: 700;
+      padding: 4.5pt 7pt;
+      white-space: nowrap;
+      text-align: left;
+    }
+    .excel-grid-table td {
+      padding: 4pt 7pt;
+      white-space: nowrap;
+    }
+    .excel-gridlines th,
+    .excel-gridlines td {
+      border: 0.6pt solid #94A3B8;
+    }
+    .excel-no-gridlines th,
+    .excel-no-gridlines td {
+      border: 0.6pt solid transparent;
+    }
+    .excel-grid-table tr:nth-child(even) td {
+      background-color: #F8FAFC;
+    }
+
+    /* Hide scrollbars cleanly where appropriate */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="flex flex-col overflow-hidden">
+
+  <!-- Hidden Offscreen Measurement Sandbox (Used to calculate exact pixel height of every block before splitting across pages) -->
+  <div id="measureSandbox" aria-hidden="true" style="position: fixed; left: -99999px; top: 0; visibility: hidden; pointer-events: none; background: white; color: black;"></div>
+
+  <!-- Toast Notification -->
+  <div id="toastContainer" class="fixed top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-none transition-all duration-300 opacity-0 translate-y-[-10px] w-[92%] max-w-md">
+    <div class="bg-slateCard border border-slateBorder text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 text-xs sm:text-sm font-medium">
+      <span class="w-2.5 h-2.5 rounded-full bg-limeAccent shrink-0 animate-pulse"></span>
+      <span id="toastMessage">Ready</span>
+    </div>
+  </div>
+
+  <!-- Top Header Bar -->
+  <header class="z-30 shrink-0 bg-slateBg border-b border-slateBorder px-2.5 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-2">
+    <div class="flex items-center gap-2 min-w-0 flex-1">
+      <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-limeAccent flex items-center justify-center text-slateBg shrink-0 shadow-[0_0_16px_rgba(223,255,94,0.3)]">
+        <svg width="16" height="16" class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+      </div>
+      <div class="min-w-0">
+        <div class="flex items-center gap-1.5">
+          <h1 class="font-bold text-sm sm:text-base tracking-tight text-white truncate" style="margin:0;">PrintStudio Pro</h1>
+          <span class="hidden sm:inline-block text-[10px] font-mono font-bold uppercase px-1.5 py-0.5 rounded bg-skyAccent/15 text-skyAccent border border-skyAccent/30">Live Reflow</span>
+        </div>
+        <p id="activeFileName" class="text-[11px] text-slate-400 truncate font-mono" style="margin:0;">Loading sample...</p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
+      <!-- Sample Switcher Pill -->
+      <div class="hidden md:flex items-center bg-slateCard border border-slateBorder rounded-xl p-0.5 text-[11px] font-semibold">
+        <button id="sampleDocxBtn" class="px-2.5 py-1.5 rounded-lg bg-slateHover text-limeAccent transition">Word Sample</button>
+        <button id="sampleXlsxBtn" class="px-2.5 py-1.5 rounded-lg text-slate-300 hover:text-white transition">Excel Sample</button>
+      </div>
+
+      <!-- Open File Button -->
+      <button id="openFileBtn" type="button" class="cursor-pointer bg-slateCard hover:bg-slateHover active:scale-95 transition text-slate-100 border border-slateBorder px-2.5 sm:px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5">
+        <svg width="16" height="16" class="w-4 h-4 text-skyAccent" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+        </svg>
+        <span>Open</span>
+      </button>
+      <input id="fileInput" type="file" accept=".pdf,.docx,.xlsx,.xls,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" class="hidden" />
+
+      <!-- System Print Button (Android PrintManager) -->
+      <button id="systemPrintBtn" type="button" class="bg-slateCard hover:bg-slateHover active:scale-95 transition text-slate-100 border border-slateBorder px-2.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5" title="Send Reflowed PDF to System Printer">
+        <svg width="16" height="16" class="w-4 h-4 text-limeAccent" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6v-8z"/>
+        </svg>
+        <span class="hidden sm:inline">Print</span>
+      </button>
+
+      <!-- Android Print Service Settings Shortcut -->
+      <button id="printSettingsBtn" type="button" class="hidden bg-slateCard hover:bg-slateHover active:scale-95 transition text-skyAccent border border-slateBorder px-2 py-2 rounded-xl text-xs font-semibold items-center gap-1" title="Enable PrintStudio Pro in Android Print Menu">
+        <svg width="16" height="16" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+      </button>
+
+      <!-- Primary Export PDF CTA -->
+      <button id="exportBtn" type="button" class="bg-limeAccent hover:bg-limeDark active:scale-95 transition text-slateBg font-bold px-3 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm flex items-center gap-1.5 shadow-[0_0_20px_rgba(223,255,94,0.22)]">
+        <svg width="16" height="16" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+        <span>Export</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Workspace: Split on Desktop, Top Multi-Page Preview + Bottom Control Deck on Mobile -->
+  <main class="flex-1 flex flex-col lg:flex-row overflow-hidden">
+
+    <!-- LEFT / TOP: Multi-Page Live Reflow Preview Stage -->
+    <section class="flex-1 flex flex-col workspace-grid relative border-b border-slateBorder">
+
+      <!-- Live Telemetry & Reflow Status Bar -->
+      <div class="px-3 py-2 flex flex-wrap items-center justify-between gap-2 bg-slateBg border-b border-slateBorder z-10 shrink-0">
+        <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+          <span id="paperBadge" class="px-2 py-0.5 rounded-md bg-slateCard border border-slateBorder text-skyAccent font-mono text-[11px] font-semibold">A4 • Portrait</span>
+          <!-- Live Reflow Delta Indicator -->
+          <span id="reflowStatusPill" class="px-2.5 py-0.5 rounded-full bg-limeAccent/15 border border-limeAccent/40 text-limeAccent font-mono text-[11px] font-semibold flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-limeAccent"></span>
+            <span id="reflowStatusText">2 Pages • Ready</span>
+          </span>
+        </div>
+
+        <div class="flex items-center gap-1.5">
+          <!-- Mobile Sample Switcher -->
+          <button id="mobileSampleToggleBtn" class="md:hidden px-2 py-1 rounded-lg bg-slateCard border border-slateBorder text-[10px] font-mono text-skyAccent">
+            Switch Sample
+          </button>
+
+          <!-- Margin Guides Toggle -->
+          <button id="toggleGuidesBtn" class="px-2 py-1 rounded-lg bg-skyAccent/15 text-skyAccent border border-skyAccent/30 text-[11px] font-medium transition">
+            Guides: ON
+          </button>
+
+          <!-- Preview Zoom -->
+          <div class="flex items-center bg-slateCard rounded-lg border border-slateBorder overflow-hidden text-xs font-mono">
+            <button id="zoomOutBtn" class="px-2 py-1 hover:bg-slateHover text-slate-200" title="Zoom Out">-</button>
+            <span id="zoomLabel" class="px-1.5 py-1 text-[11px] text-slate-200 border-x border-slateBorder">Auto</span>
+            <button id="zoomInBtn" class="px-2 py-1 hover:bg-slateHover text-slate-200" title="Zoom In">+</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Loading Overlay -->
+      <div id="loadingOverlay" class="hidden absolute inset-0 bg-slateBg/85 backdrop-blur-sm z-20 flex flex-col items-center justify-center gap-3">
+        <div class="w-10 h-10 border-4 border-slateBorder border-t-limeAccent rounded-full animate-spin"></div>
+        <p id="loadingText" class="text-xs font-mono text-limeAccent">Reflowing pages...</p>
+      </div>
+
+      <!-- Vertical Multi-Page Scrollable Stage -->
+      <div id="pagesScrollContainer" class="flex-1 overflow-y-auto overflow-x-auto p-4 sm:p-8 flex flex-col items-center gap-6 scroll-smooth">
+        <!-- Paginated Paper Sheets are dynamically injected here -->
+      </div>
+
+      <!-- Quick Page Jump Strip (Bottom of Preview Area) -->
+      <div id="pageJumpStrip" class="px-3 py-1.5 bg-slateBg/95 border-t border-slateBorder flex items-center gap-2 overflow-x-auto no-scrollbar">
+        <span class="text-[10px] font-mono uppercase tracking-wider text-slate-400 shrink-0">Jump to Page:</span>
+        <div id="pageJumpButtons" class="flex items-center gap-1.5">
+          <!-- Page buttons 1, 2, 3... injected dynamically -->
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT / BOTTOM: Desktop-Grade Print & Reflow Control Deck -->
+    <aside class="w-full bg-slateBg flex flex-col shrink-0">
+
+      <!-- Category Navigation Tabs -->
+      <nav class="grid grid-cols-4 gap-1 p-2 bg-slateCard border-b border-slateBorder shrink-0">
+        <button data-tab="margins" class="tab-btn active-tab py-2 px-2 rounded-xl text-xs font-bold flex flex-col sm:flex-row items-center justify-center gap-1 transition bg-limeAccent text-slateBg">
+          <svg width="16" height="16" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm4 0v14m8-14v14M4 9h16M4 15h16"/></svg>
+          <span>Margins</span>
+        </button>
+
+        <button data-tab="paper" class="tab-btn py-2 px-2 rounded-xl text-xs font-semibold flex flex-col sm:flex-row items-center justify-center gap-1 transition text-slate-400 hover:text-white hover:bg-slateHover">
+          <svg width="16" height="16" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+          <span>Paper</span>
+        </button>
+
+        <button data-tab="scaling" class="tab-btn py-2 px-2 rounded-xl text-xs font-semibold flex flex-col sm:flex-row items-center justify-center gap-1 transition text-slate-400 hover:text-white hover:bg-slateHover">
+          <svg width="16" height="16" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
+          <span>Layout</span>
+        </button>
+
+        <button data-tab="extras" class="tab-btn py-2 px-2 rounded-xl text-xs font-semibold flex flex-col sm:flex-row items-center justify-center gap-1 transition text-slate-400 hover:text-white hover:bg-slateHover">
+          <svg width="16" height="16" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+          <span>Header/No.</span>
+        </button>
+      </nav>
+
+      <!-- Scrollable Control Panels -->
+      <div class="flex-1 overflow-y-auto p-3.5 sm:p-4 space-y-3.5">
+
+        <!-- TAB 1: MARGINS (OPEN BY DEFAULT SO USER CAN IMMEDIATELY TEST REFLOW) -->
+        <div id="tab-margins" class="tab-panel space-y-3.5">
+          <!-- Presets & Unit Switcher -->
+          <div class="bg-slateCard border border-slateBorder rounded-2xl p-3.5 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-300">Margin Presets</span>
+              <div class="flex bg-slateBg p-0.5 rounded-lg border border-slateBorder text-[11px] font-mono">
+                <button data-unit="mm" class="unit-btn px-2.5 py-1 rounded-md bg-limeAccent text-slateBg font-bold">mm</button>
+                <button data-unit="in" class="unit-btn px-2.5 py-1 rounded-md text-slate-400 hover:text-white">inch</button>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2">
+              <button data-margin-preset="normal" class="margin-preset-btn p-2 rounded-xl border-2 border-limeAccent bg-limeAccent/10 text-center transition">
+                <div class="text-xs font-bold text-white">Normal</div>
+                <div class="text-[10px] font-mono text-limeAccent">25.4 mm</div>
+              </button>
+              <button data-margin-preset="narrow" class="margin-preset-btn p-2 rounded-xl border border-slateBorder bg-slateBg/60 text-center transition">
+                <div class="text-xs font-bold text-slate-200">Narrow</div>
+                <div class="text-[10px] font-mono text-slate-400">12.7 mm</div>
+              </button>
+              <button data-margin-preset="moderate" class="margin-preset-btn p-2 rounded-xl border border-slateBorder bg-slateBg/60 text-center transition">
+                <div class="text-xs font-bold text-slate-200">Moderate</div>
+                <div class="text-[10px] font-mono text-slate-400">25.4 / 19.1</div>
+              </button>
+              <button data-margin-preset="wide" class="margin-preset-btn p-2 rounded-xl border border-slateBorder bg-slateBg/60 text-center transition">
+                <div class="text-xs font-bold text-slate-200">Wide</div>
+                <div class="text-[10px] font-mono text-slate-400">25.4 / 50.8</div>
+              </button>
+              <button data-margin-preset="compact" class="margin-preset-btn p-2 rounded-xl border border-slateBorder bg-slateBg/60 text-center transition">
+                <div class="text-xs font-bold text-slate-200">Ultra-Tight</div>
+                <div class="text-[10px] font-mono text-slate-400">6.0 mm</div>
+              </button>
+              <button id="linkMarginsBtn" class="p-2 rounded-xl border border-slateBorder bg-slateBg/60 text-center flex flex-col items-center justify-center transition">
+                <div class="text-xs font-bold text-slate-200">
+                  <span id="linkLabel">Link: OFF</span>
+                </div>
+                <div class="text-[10px] text-slate-400">Sync All 4</div>
+              </button>
+            </div>
+          </div>
+
+          <!-- Fine-Tune Custom Sliders (Top, Bottom, Left, Right) -->
+          <div class="bg-slateCard border border-slateBorder rounded-2xl p-3.5 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-300">Custom Margins (Live Reflow)</span>
+              <span class="text-[10px] font-mono text-skyAccent">Drag to shift lines</span>
+            </div>
+
+            <!-- Top -->
+            <div class="space-y-1">
+              <div class="flex items-center justify-between text-xs">
+                <label for="marginTopInput" class="font-medium text-slate-200">Top Margin</label>
+                <div class="flex items-center gap-1">
+                  <input id="marginTopInput" type="number" step="0.5" min="0" max="120" value="25.4" class="w-16 bg-slateBg border border-slateBorder focus:border-limeAccent rounded-lg px-2 py-1 text-right font-mono text-xs text-limeAccent outline-none" />
+                  <span class="unit-label text-[11px] font-mono text-slate-400">mm</span>
+                </div>
+              </div>
+              <input id="marginTopSlider" type="range" min="0" max="90" step="0.5" value="25.4" class="w-full" />
+            </div>
+
+            <!-- Bottom -->
+            <div class="space-y-1">
+              <div class="flex items-center justify-between text-xs">
+                <label for="marginBottomInput" class="font-medium text-slate-200">Bottom Margin</label>
+                <div class="flex items-center gap-1">
+                  <input id="marginBottomInput" type="number" step="0.5" min="0" max="120" value="25.4" class="w-16 bg-slateBg border border-slateBorder focus:border-limeAccent rounded-lg px-2 py-1 text-right font-mono text-xs text-limeAccent outline-none" />
+                  <span class="unit-label text-[11px] font-mono text-slate-400">mm</span>
+                </div>
+              </div>
+              <input id="marginBottomSlider" type="range" min="0" max="90" step="0.5" value="25.4" class="w-full" />
+            </div>
+
+            <!-- Left -->
+            <div class="space-y-1">
+              <div class="flex items-center justify-between text-xs">
+                <label for="marginLeftInput" class="font-medium text-slate-200">Left Margin</label>
+                <div class="flex items-center gap-1">
+                  <input id="marginLeftInput" type="number" step="0.5" min="0" max="120" value="25.4" class="w-16 bg-slateBg border border-slateBorder focus:border-limeAccent rounded-lg px-2 py-1 text-right font-mono text-xs text-limeAccent outline-none" />
+                  <span class="unit-label text-[11px] font-mono text-slate-400">mm</span>
+                </div>
+              </div>
+              <input id="marginLeftSlider" type="range" min="0" max="90" step="0.5" value="25.4" class="w-full" />
+            </div>
+
+            <!-- Right -->
+            <div class="space-y-1">
+              <div class="flex items-center justify-between text-xs">
+                <label for="marginRightInput" class="font-medium text-slate-200">Right Margin</label>
+                <div class="flex items-center gap-1">
+                  <input id="marginRightInput" type="number" step="0.5" min="0" max="120" value="25.4" class="w-16 bg-slateBg border border-slateBorder focus:border-limeAccent rounded-lg px-2 py-1 text-right font-mono text-xs text-limeAccent outline-none" />
+                  <span class="unit-label text-[11px] font-mono text-slate-400">mm</span>
+                </div>
+              </div>
+              <input id="marginRightSlider" type="range" min="0" max="90" step="0.5" value="25.4" class="w-full" />
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 2: PAPER SIZE & ORIENTATION -->
+        <div id="tab-paper" class="tab-panel hidden space-y-3.5">
+          <!-- Orientation -->
+          <div class="bg-slateCard border border-slateBorder rounded-2xl p-3.5 space-y-2.5">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-300 block">Orientation</span>
+            <div class="grid grid-cols-2 gap-2.5">
+              <button data-orient="portrait" class="orient-btn active-orient flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 border-limeAccent bg-limeAccent/10 text-white font-semibold text-xs transition">
+                <span class="w-3.5 h-5 border-2 border-current rounded-[2px]"></span>
+                <span>Portrait</span>
+              </button>
+              <button data-orient="landscape" class="orient-btn flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-slateBorder bg-slateBg/60 text-slate-400 hover:text-white font-semibold text-xs transition">
+                <span class="w-5 h-3.5 border-2 border-current rounded-[2px]"></span>
+                <span>Landscape</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Paper Presets -->
+          <div class="bg-slateCard border border-slateBorder rounded-2xl p-3.5 space-y-2.5">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-300 block">Standard Paper Sizes</span>
+            <div class="grid grid-cols-2 gap-2">
+              <button data-paper="A4" class="paper-btn active-paper p-2.5 rounded-xl border-2 border-limeAccent bg-limeAccent/10 text-left transition">
+                <div class="font-bold text-xs text-white">A4</div>
+                <div class="text-[10px] font-mono text-limeAccent">210 × 297 mm</div>
+              </button>
+              <button data-paper="Legal" class="paper-btn p-2.5 rounded-xl border border-slateBorder bg-slateBg/60 hover:border-slate-500 text-left transition">
+                <div class="font-bold text-xs text-slate-200">Legal</div>
+                <div class="text-[10px] font-mono text-slate-400">216 × 356 mm</div>
+              </button>
+              <button data-paper="Letter" class="paper-btn p-2.5 rounded-xl border border-slateBorder bg-slateBg/60 hover:border-slate-500 text-left transition">
+                <div class="font-bold text-xs text-slate-200">Letter</div>
+                <div class="text-[10px] font-mono text-slate-400">216 × 279 mm</div>
+              </button>
+              <button data-paper="A3" class="paper-btn p-2.5 rounded-xl border border-slateBorder bg-slateBg/60 hover:border-slate-500 text-left transition">
+                <div class="font-bold text-xs text-slate-200">A3</div>
+                <div class="text-[10px] font-mono text-slate-400">297 × 420 mm</div>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 3: SCALING, EXCEL GRID & N-UP LAYOUT -->
+        <div id="tab-scaling" class="tab-panel hidden space-y-3.5">
+          <!-- Scaling Mode -->
+          <div class="bg-slateCard border border-slateBorder rounded-2xl p-3.5 space-y-2.5">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-300 block">PC Print Scaling & Fit</span>
+
+            <div class="grid grid-cols-1 gap-2">
+              <button data-scale-mode="custom" class="scale-mode-btn active-scale p-2.5 rounded-xl border-2 border-limeAccent bg-limeAccent/10 text-left flex items-center justify-between transition">
+                <div>
+                  <div class="text-xs font-bold text-white">Custom Scale % (Reflow Across Pages)</div>
+                  <div class="text-[11px] text-slate-400">Shrink or enlarge text/cells (50% – 150%)</div>
+                </div>
+                <span id="customScaleBadge" class="text-xs font-mono font-bold text-limeAccent">100%</span>
+              </button>
+
+              <button data-scale-mode="fit-width" class="scale-mode-btn p-2.5 rounded-xl border border-slateBorder bg-slateBg/60 hover:border-slate-500 text-left flex items-center justify-between transition">
+                <div>
+                  <div class="text-xs font-bold text-slate-200">Fit All Columns on 1 Page Wide</div>
+                  <div class="text-[11px] text-slate-400">Fits width; spills rows onto Page 2, 3...</div>
+                </div>
+                <span class="text-[10px] font-mono text-skyAccent font-bold">EXCEL</span>
+              </button>
+
+              <button data-scale-mode="fit-single" class="scale-mode-btn p-2.5 rounded-xl border border-slateBorder bg-slateBg/60 hover:border-slate-500 text-left flex items-center justify-between transition">
+                <div>
+                  <div class="text-xs font-bold text-slate-200">Fit Entire Sheet on 1 Single Page</div>
+                  <div class="text-[11px] text-slate-400">Auto-scales width & height onto Page 1</div>
+                </div>
+                <span class="text-[10px] font-mono text-slate-400">1-PAGE</span>
+              </button>
+            </div>
+
+            <!-- Custom Scale Slider -->
+            <div id="customScaleBox" class="pt-2 border-t border-slateBorder space-y-1.5">
+              <div class="flex items-center justify-between text-xs">
+                <span class="text-slate-300">Scale Percentage</span>
+                <span id="customScaleText" class="font-mono font-bold text-limeAccent">100%</span>
+              </div>
+              <input id="customScaleSlider" type="range" min="50" max="150" step="2" value="100" class="w-full" />
+            </div>
+          </div>
+
+          <!-- Table / Excel Header Repeat & Page Order -->
+          <div class="bg-slateCard border border-slateBorder rounded-2xl p-3.5 space-y-3">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-300 block">Table & Spreadsheet Reflow Rules</span>
+
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-xs font-semibold text-white">Repeat Table/Excel Header Row</div>
+                <div class="text-[11px] text-slate-400">Repeats column headers at top of Page 2, 3...</div>
+              </div>
+              <input id="repeatHeadersToggle" type="checkbox" checked class="w-5 h-5 accent-[#DFFF5E] rounded cursor-pointer" />
+            </div>
+
+            <div id="excelOptionsBox" class="pt-2.5 border-t border-slateBorder space-y-2.5">
+              <div class="flex items-center justify-between">
+                <div>
+                  <div class="text-xs font-semibold text-white">Print Excel Gridlines</div>
+                  <div class="text-[11px] text-slate-400">Shows crisp cell borders on spreadsheets</div>
+                </div>
+                <input id="excelGridlinesToggle" type="checkbox" checked class="w-5 h-5 accent-[#DFFF5E] rounded cursor-pointer" />
+              </div>
+
+              <div>
+                <label class="text-[11px] text-slate-400 block mb-1">Multi-Column Page Order (When Wide)</label>
+                <div class="grid grid-cols-2 gap-2">
+                  <button data-page-order="down-then-over" class="page-order-btn py-2 px-2.5 rounded-xl border-2 border-limeAccent bg-limeAccent/10 text-[11px] font-semibold text-white">
+                    ↓→ Down, then over
+                  </button>
+                  <button data-page-order="over-then-down" class="page-order-btn py-2 px-2.5 rounded-xl border border-slateBorder bg-slateBg/60 text-[11px] font-semibold text-slate-400">
+                    →↓ Over, then down
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- PDF N-Up Mode (For uploaded PDF files) -->
+          <div id="pdfNupBox" class="hidden bg-slateCard border border-slateBorder rounded-2xl p-3.5 space-y-2.5">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-300 block">PDF Pages Per Sheet (N-Up)</span>
+            <div class="grid grid-cols-3 gap-2">
+              <button data-nup="1" class="nup-btn py-2 rounded-xl border-2 border-limeAccent bg-limeAccent/10 text-xs font-bold text-white">1 Page</button>
+              <button data-nup="2" class="nup-btn py-2 rounded-xl border border-slateBorder bg-slateBg/60 text-xs font-semibold text-slate-300">2-Up</button>
+              <button data-nup="4" class="nup-btn py-2 rounded-xl border border-slateBorder bg-slateBg/60 text-xs font-semibold text-slate-300">4-Up</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 4: HEADER, FOOTER & PAGE NUMBERS -->
+        <div id="tab-extras" class="tab-panel hidden space-y-3.5">
+          <div class="bg-slateCard border border-slateBorder rounded-2xl p-3.5 space-y-3">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-300 block">Running Headers & Footers</span>
+
+            <div>
+              <label for="headerTextInput" class="text-[11px] text-slate-400 block mb-1">Header Text (Printed inside top margin)</label>
+              <input id="headerTextInput" type="text" placeholder="e.g., OFFICE OF THE PRINCIPAL • OFFICIAL CIRCULAR" class="w-full bg-slateBg border border-slateBorder focus:border-limeAccent rounded-xl px-3 py-2 text-xs text-white outline-none" />
+            </div>
+
+            <div>
+              <label for="footerTextInput" class="text-[11px] text-slate-400 block mb-1">Custom Footer Note (Left side)</label>
+              <input id="footerTextInput" type="text" placeholder="e.g., Confidential — Internal Distribution" class="w-full bg-slateBg border border-slateBorder focus:border-limeAccent rounded-xl px-3 py-2 text-xs text-white outline-none" />
+            </div>
+
+            <div class="flex items-center justify-between pt-2 border-t border-slateBorder">
+              <div>
+                <div class="text-xs font-semibold text-white">Dynamic Page Numbering</div>
+                <div class="text-[11px] text-slate-400">Prints "Page X of Y" in bottom footer</div>
+              </div>
+              <input id="pageNumbersToggle" type="checkbox" checked class="w-5 h-5 accent-[#DFFF5E] rounded cursor-pointer" />
+            </div>
+
+            <div class="flex items-center justify-between pt-2 border-t border-slateBorder">
+              <div>
+                <div class="text-xs font-semibold text-white">Include Today's Date Stamp</div>
+                <div class="text-[11px] text-slate-400">Prints date in top-right header</div>
+              </div>
+              <input id="dateStampToggle" type="checkbox" class="w-5 h-5 accent-[#DFFF5E] rounded cursor-pointer" />
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </aside>
+  </main>
+
+  <script>
+    function ensurePdfJsWorker() {
+      if (typeof pdfjsLib !== 'undefined' && pdfjsLib.GlobalWorkerOptions) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      }
+    }
+
+    // =========================================================================
+    // 1. CONSTANTS & APPLICATION STATE
+    // =========================================================================
+    const MM_TO_PX = 96 / 25.4; // Standard CSS 96 DPI: 1 mm = 3.77952756 px
+    const MM_TO_PT = 72 / 25.4; // Standard PDF 72 DPI: 1 mm = 2.83464567 pt
+    const IN_TO_MM = 25.4;
+
+    const PAPER_PRESETS = {
+      A4:     { w: 210, h: 297 },
+      Legal:  { w: 216, h: 356 },
+      Letter: { w: 216, h: 279 },
+      A3:     { w: 297, h: 420 }
+    };
+
+    const MARGIN_PRESETS = {
+      normal:   { top: 25.4, bottom: 25.4, left: 25.4, right: 25.4 },
+      narrow:   { top: 12.7, bottom: 12.7, left: 12.7, right: 12.7 },
+      moderate: { top: 25.4, bottom: 25.4, left: 19.1, right: 19.1 },
+      wide:     { top: 25.4, bottom: 25.4, left: 50.8, right: 50.8 },
+      compact:  { top: 6.0,  bottom: 6.0,  left: 6.0,  right: 6.0  }
+    };
+
+    const state = {
+      docType: 'docx',          // 'docx' | 'xlsx' | 'pdf'
+      fileName: 'Official_Administrative_Circular',
+
+      // Parsed Source Content
+      docxHtml: '',             // HTML string for .docx / rich text
+      xlsxRows: [],             // 2D array of cell values for .xlsx
+      xlsxSheetName: 'Sheet1',
+      pdfBytes: null,           // Uint8Array for uploaded .pdf
+      pdfJsDoc: null,
+
+      // Paper & Margins (stored internally in mm)
+      paperName: 'A4',
+      paperWidthMm: 210,
+      paperHeightMm: 297,
+      orientation: 'portrait',  // 'portrait' | 'landscape'
+      unit: 'mm',               // 'mm' | 'in'
+      linkMargins: false,
+      marginsMm: {
+        top: 25.4,
+        bottom: 25.4,
+        left: 25.4,
+        right: 25.4
+      },
+
+      // Scaling & Reflow Settings
+      scaleMode: 'custom',      // 'custom' | 'fit-width' | 'fit-single'
+      customScale: 100,         // 50 - 150 (%)
+      repeatHeaders: true,
+      excelGridlines: true,
+      pageOrder: 'down-then-over', // 'down-then-over' | 'over-then-down'
+      pdfNup: 1,                // 1 | 2 | 4 (for uploaded PDFs)
+
+      // Running Headers & Footers
+      headerText: '',
+      footerText: '',
+      showPageNumbers: true,
+      showDateStamp: false,
+
+      // Preview UI State
+      showGuides: true,
+      manualZoomMultiplier: 1.0,
+      paginatedPages: [],       // Array of rendered page objects
+      previousPageCount: 0,
+      activeSample: 'docx'
+    };
+
+    // =========================================================================
+    // 2. BUILT-IN RICH SAMPLES (SO USER CAN SEE LIVE REFLOW IMMEDIATELY)
+    // =========================================================================
+    const SAMPLE_DOCX_HTML = `
+      <h1>OFFICE OF THE DIRECTORATE OF EDUCATION &amp; ADMINISTRATION</h1>
+      <p><strong>Circular No. DOE/ADMIN/2026/418-B</strong> &nbsp;|&nbsp; <strong>Subject:</strong> Annual Academic Infrastructure Audit, Laboratory Equipment Allocation &amp; Examination Guidelines.</p>
+      <p>1. All heads of institutions and department coordinators are hereby informed that the annual verification of instructional laboratories, library registers, and digital classroom equipment will commence from the first Monday of next month. Please ensure that all stock registers are updated and countersigned prior to inspection.</p>
+      <h2>Section A: Mandatory Compliance Checklist</h2>
+      <ul>
+        <li><strong>Attendance &amp; Faculty Rosters:</strong> Biometric and manual attendance logs must be reconciled up to the current working week with zero unverified discrepancies.</li>
+        <li><strong>Science &amp; Computer Laboratories:</strong> Functional status of all workstation terminals, power backup units, and safety fire extinguishers must be documented in Annexure-I.</li>
+        <li><strong>Library &amp; Reference Section:</strong> Newly procured textbooks and competitive examination reference volumes must be accessioned and barcoded.</li>
+        <li><strong>Student Welfare &amp; Scholarship Records:</strong> Bank seeding verification lists for all eligible merit-cum-means scholarship applicants must be submitted in sealed envelopes.</li>
+      </ul>
+      <h2>Section B: Department-Wise Equipment &amp; Grant Allocation Table</h2>
+      <p>The following table details the sanctioned recurring grant and equipment quota for each academic wing. Notice how adjusting margins or scaling dynamically moves rows between Page 1 and Page 2:</p>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 12%;">Code</th>
+            <th style="width: 34%;">Department / Wing</th>
+            <th style="width: 24%;">Lab / Unit Lead</th>
+            <th style="width: 14%;">Units</th>
+            <th style="width: 16%;">Sanctioned Grant</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>DEPT-01</td><td>Physics &amp; Applied Mechanics Lab</td><td>Dr. R. K. Sharma</td><td>24 Sets</td><td>₹ 1,45,000</td></tr>
+          <tr><td>DEPT-02</td><td>Chemistry &amp; Analytical Instrumentation</td><td>Prof. Meera Nair</td><td>30 Sets</td><td>₹ 1,82,500</td></tr>
+          <tr><td>DEPT-03</td><td>Biology &amp; Environmental Sciences</td><td>Dr. S. Subramanian</td><td>18 Sets</td><td>₹ 96,000</td></tr>
+          <tr><td>DEPT-04</td><td>Computer Science &amp; AI Workstation Hub</td><td>Mr. Vikramaditya Rao</td><td>40 PCs</td><td>₹ 4,20,000</td></tr>
+          <tr><td>DEPT-05</td><td>Mathematics &amp; Statistical Modeling</td><td>Mrs. Anjali Deshmukh</td><td>15 Kits</td><td>₹ 54,000</td></tr>
+          <tr><td>DEPT-06</td><td>Central Digital Library &amp; E-Journals</td><td>Mr. Harpreet Singh</td><td>12 Terminals</td><td>₹ 1,10,000</td></tr>
+          <tr><td>DEPT-07</td><td>Electronics &amp; Robotics Prototyping</td><td>Dr. Kavita Krishnan</td><td>20 Kits</td><td>₹ 1,65,000</td></tr>
+          <tr><td>DEPT-08</td><td>Languages &amp; Audio-Visual Communication</td><td>Ms. Farida Begum</td><td>25 Headsets</td><td>₹ 78,500</td></tr>
+          <tr><td>DEPT-09</td><td>Commerce &amp; Tally Accounting Lab</td><td>Mr. Rajeshwar Verma</td><td>30 Licenses</td><td>₹ 88,000</td></tr>
+          <tr><td>DEPT-10</td><td>Sports &amp; Physical Education Complex</td><td>Mr. Devendra Rathore</td><td>45 Kits</td><td>₹ 1,12,000</td></tr>
+          <tr><td>DEPT-11</td><td>Examination Cell &amp; Secure Printing</td><td>Mrs. Sunita Kulkarni</td><td>04 Printers</td><td>₹ 95,000</td></tr>
+          <tr><td>DEPT-12</td><td>Solar Power &amp; Campus Maintenance</td><td>Er. Pradeep Joshi</td><td>02 Inverters</td><td>₹ 2,10,000</td></tr>
+        </tbody>
+      </table>
+      <h2>Section C: Submission Timeline &amp; Sign-Off</h2>
+      <p>2. Hard copies of the signed utilization certificates must be printed on A4 or Legal sheets with clear margins and submitted to the Regional Office before 4:00 PM on Friday. Incomplete forms or clipped tables will be returned without processing.</p>
+      <p>3. For technical assistance regarding digital ledger formatting, contact the IT Nodal Officer during working hours.</p>
+    `;
+
+    function generateSampleXlsxRows() {
+      const headers = [
+        'Roll No', 'Student Full Name', 'Class / Sec', 'Mathematics', 'Physics',
+        'Chemistry', 'English', 'Computer Sc.', 'Total Marks', 'Percentage', 'Attendance %', 'Remarks'
+      ];
+      const names = [
+        'Aarav Sharma', 'Diya Patel', 'Rohan Verma', 'Ananya Iyer', 'Kabir Singh',
+        'Sneha Nair', 'Aditya Kulkarni', 'Priya Menon', 'Vivaan Joshi', 'Ishita Gupta',
+        'Arjun Reddy', 'Kavya Deshmukh', 'Siddharth Rao', 'Meera Krishnan', 'Rahul Choudhury',
+        'Nandini Bose', 'Karthik Subramanian', 'Pooja Malhotra', 'Devansh Tiwari', 'Riya Banerjee',
+        'Harshvardhan Gill', 'Tanvi Saxena', 'Pranav Mishra', 'Shruti Chatterjee', 'Manish Yadav',
+        'Aditi Bhardwaj', 'Nikhil Agarwal', 'Swati Hegde', 'Varun Kapoor', 'Deepika Pillai',
+        'Abhishek Sinha', 'Gauri Gokhale', 'Tushar Pandey', 'Pallavi Joshi', 'Yashwant Chauhan'
+      ];
+      const rows = [headers];
+      names.forEach((name, idx) => {
+        const m = 72 + ((idx * 7) % 27);
+        const p = 68 + ((idx * 11) % 30);
+        const c = 70 + ((idx * 5) % 28);
+        const e = 78 + ((idx * 3) % 20);
+        const cs = 80 + ((idx * 9) % 19);
+        const tot = m + p + c + e + cs;
+        const pct = (tot / 5).toFixed(1) + '%';
+        const att = (84 + (idx % 16)) + '%';
+        rows.push([
+          `2026-${String(101 + idx)}`,
+          name,
+          idx % 2 === 0 ? 'XII-A' : 'XII-B',
+          m, p, c, e, cs, tot, pct, att,
+          tot >= 410 ? 'Distinction' : 'First Division'
+        ]);
+      });
+      return rows;
+    }
+
+    // =========================================================================
+    // 3. DOM ELEMENTS & UTILITIES
+    // =========================================================================
+    const els = {
+      measureSandbox: document.getElementById('measureSandbox'),
+      pagesScrollContainer: document.getElementById('pagesScrollContainer'),
+      pageJumpButtons: document.getElementById('pageJumpButtons'),
+      activeFileName: document.getElementById('activeFileName'),
+      paperBadge: document.getElementById('paperBadge'),
+      reflowStatusText: document.getElementById('reflowStatusText'),
+      loadingOverlay: document.getElementById('loadingOverlay'),
+      loadingText: document.getElementById('loadingText'),
+      toastContainer: document.getElementById('toastContainer'),
+      toastMessage: document.getElementById('toastMessage'),
+      fileInput: document.getElementById('fileInput'),
+      exportBtn: document.getElementById('exportBtn'),
+      systemPrintBtn: document.getElementById('systemPrintBtn'),
+      toggleGuidesBtn: document.getElementById('toggleGuidesBtn'),
+      zoomInBtn: document.getElementById('zoomInBtn'),
+      zoomOutBtn: document.getElementById('zoomOutBtn'),
+      zoomLabel: document.getElementById('zoomLabel'),
+      excelOptionsBox: document.getElementById('excelOptionsBox'),
+      pdfNupBox: document.getElementById('pdfNupBox'),
+    };
+
+    let toastTimer = null;
+    function showToast(msg) {
+      els.toastMessage.textContent = msg;
+      els.toastContainer.classList.remove('opacity-0', 'translate-y-[-10px]');
+      els.toastContainer.classList.add('opacity-100', 'translate-y-0');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        els.toastContainer.classList.add('opacity-0', 'translate-y-[-10px]');
+        els.toastContainer.classList.remove('opacity-100', 'translate-y-0');
+      }, 2800);
+    }
+
+    function getEffectivePaperMm() {
+      const w = state.paperWidthMm;
+      const h = state.paperHeightMm;
+      return state.orientation === 'landscape'
+        ? { w: Math.max(w, h), h: Math.min(w, h) }
+        : { w: Math.min(w, h), h: Math.max(w, h) };
+    }
+
+    function getPrintableAreaMm() {
+      const paper = getEffectivePaperMm();
+      const safeTop = Math.min(state.marginsMm.top, paper.h * 0.42);
+      const safeBottom = Math.min(state.marginsMm.bottom, paper.h * 0.42);
+      const safeLeft = Math.min(state.marginsMm.left, paper.w * 0.42);
+      const safeRight = Math.min(state.marginsMm.right, paper.w * 0.42);
+
+      return {
+        paperW: paper.w,
+        paperH: paper.h,
+        top: safeTop,
+        bottom: safeBottom,
+        left: safeLeft,
+        right: safeRight,
+        contentW: Math.max(20, paper.w - safeLeft - safeRight),
+        contentH: Math.max(20, paper.h - safeTop - safeBottom)
+      };
+    }
+
+    function getTodayFormatted() {
+      const d = new Date();
+      return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+
+    // =========================================================================
+    // 4. TRUE DYNAMIC PAGINATION & PAGE REFLOW ENGINE
+    // =========================================================================
+
+    function paginateDocxContent(area) {
+      const scale = state.scaleMode === 'fit-single'
+        ? 0.72
+        : (state.scaleMode === 'fit-width' ? 1.0 : (state.customScale / 100));
+
+      const contentW_px = area.contentW * MM_TO_PX;
+      const contentH_px = area.contentH * MM_TO_PX;
+
+      const layoutW_px = contentW_px / scale;
+      const maxUnscaledH_px = contentH_px / scale;
+
+      const sandbox = els.measureSandbox;
+      sandbox.style.width = `${layoutW_px}px`;
+      sandbox.innerHTML = `<div class="doc-flow-content">${state.docxHtml}</div>`;
+      const root = sandbox.firstElementChild;
+
+      const atomicBlocks = [];
+      Array.from(root.children).forEach(el => {
+        const tag = el.tagName.toLowerCase();
+        if (tag === 'table') {
+          const thead = el.querySelector('thead');
+          const theadHtml = thead ? thead.outerHTML : '';
+          const bodyRows = Array.from(el.querySelectorAll('tbody tr'));
+          const allRows = bodyRows.length > 0 ? bodyRows : Array.from(el.querySelectorAll('tr'));
+
+          allRows.forEach((tr, rIdx) => {
+            if (rIdx === 0 && !thead && tr.querySelector('th')) return;
+            atomicBlocks.push({
+              type: 'table-row',
+              theadHtml,
+              rowHtml: tr.outerHTML
+            });
+          });
+        } else if (tag === 'ul' || tag === 'ol') {
+          Array.from(el.children).forEach(li => {
+            atomicBlocks.push({
+              type: 'list-item',
+              listTag: tag,
+              html: li.outerHTML
+            });
+          });
+        } else {
+          atomicBlocks.push({
+            type: 'block',
+            html: el.outerHTML
+          });
+        }
+      });
+
+      const pagesHtml = [];
+      let currentPageBlocks = [];
+
+      const buildHtmlFromBlocks = (blocks) => {
+        let out = '';
+        let inTable = false;
+        let inList = null;
+
+        blocks.forEach(b => {
+          if (b.type === 'table-row') {
+            if (inList) { out += `</${inList}>`; inList = null; }
+            if (!inTable) {
+              out += `<table>${state.repeatHeaders ? b.theadHtml : ''}<tbody>`;
+              inTable = true;
+            }
+            out += b.rowHtml;
+          } else if (b.type === 'list-item') {
+            if (inTable) { out += `</tbody></table>`; inTable = false; }
+            if (inList !== b.listTag) {
+              if (inList) out += `</${inList}>`;
+              out += `<${b.listTag}>`;
+              inList = b.listTag;
+            }
+            out += b.html;
+          } else {
+            if (inTable) { out += `</tbody></table>`; inTable = false; }
+            if (inList) { out += `</${inList}>`; inList = null; }
+            out += b.html;
+          }
+        });
+
+        if (inTable) out += `</tbody></table>`;
+        if (inList) out += `</${inList}>`;
+        return out;
+      };
+
+      const testContainer = document.createElement('div');
+      testContainer.className = 'doc-flow-content';
+      sandbox.innerHTML = '';
+      sandbox.appendChild(testContainer);
+
+      for (let i = 0; i < atomicBlocks.length; i++) {
+        const candidate = [...currentPageBlocks, atomicBlocks[i]];
+        testContainer.innerHTML = buildHtmlFromBlocks(candidate);
+        const measuredH = testContainer.getBoundingClientRect().height;
+
+        if (measuredH > maxUnscaledH_px && currentPageBlocks.length > 0 && state.scaleMode !== 'fit-single') {
+          pagesHtml.push(buildHtmlFromBlocks(currentPageBlocks));
+          currentPageBlocks = [atomicBlocks[i]];
+        } else {
+          currentPageBlocks.push(atomicBlocks[i]);
+        }
+      }
+
+      if (currentPageBlocks.length > 0) {
+        pagesHtml.push(buildHtmlFromBlocks(currentPageBlocks));
+      }
+
+      let effectiveScale = scale;
+      if (state.scaleMode === 'fit-single' && pagesHtml.length > 0) {
+        testContainer.innerHTML = pagesHtml[0];
+        const fullH = testContainer.getBoundingClientRect().height;
+        if (fullH > 0) {
+          effectiveScale = Math.min(1.0, (contentH_px / fullH) * 0.96);
+        }
+      }
+
+      return pagesHtml.map(html => ({
+        kind: 'html',
+        html,
+        scale: effectiveScale
+      }));
+    }
+
+    function paginateXlsxContent(area) {
+      const rows = state.xlsxRows;
+      if (!rows || rows.length === 0) return [];
+
+      const contentW_px = area.contentW * MM_TO_PX;
+      const contentH_px = area.contentH * MM_TO_PX;
+
+      const headerRow = rows[0] || [];
+      const dataRows = rows.slice(1);
+      const totalCols = headerRow.length;
+
+      const sandbox = els.measureSandbox;
+      sandbox.style.width = '4000px';
+      const gridClass = state.excelGridlines ? 'excel-gridlines' : 'excel-no-gridlines';
+
+      let sampleHtml = `<table class="excel-grid-table ${gridClass}"><thead><tr>`;
+      headerRow.forEach(cell => { sampleHtml += `<th>${cell ?? ''}</th>`; });
+      sampleHtml += `</tr></thead><tbody>`;
+      dataRows.slice(0, 25).forEach(r => {
+        sampleHtml += `<tr>`;
+        for (let c = 0; c < totalCols; c++) {
+          sampleHtml += `<td>${r[c] ?? ''}</td>`;
+        }
+        sampleHtml += `</tr>`;
+      });
+      sampleHtml += `</tbody></table>`;
+      sandbox.innerHTML = sampleHtml;
+
+      const tableEl = sandbox.querySelector('table');
+      const thEls = Array.from(tableEl.querySelectorAll('th'));
+      const colWidths = thEls.map(th => Math.max(48, th.getBoundingClientRect().width + 4));
+      const totalNaturalW = colWidths.reduce((a, b) => a + b, 0);
+
+      const sampleTr = tableEl.querySelector('tbody tr');
+      const headerH = (tableEl.querySelector('thead')?.getBoundingClientRect().height) || 26;
+      const rowH = sampleTr ? sampleTr.getBoundingClientRect().height : 23;
+      const totalNaturalH = headerH + (dataRows.length * rowH);
+
+      let scale = state.customScale / 100;
+      if (state.scaleMode === 'fit-width') {
+        scale = Math.min(1.25, contentW_px / Math.max(1, totalNaturalW));
+      } else if (state.scaleMode === 'fit-single') {
+        const scaleW = contentW_px / Math.max(1, totalNaturalW);
+        const scaleH = contentH_px / Math.max(1, totalNaturalH);
+        scale = Math.min(1.25, scaleW, scaleH);
+      }
+
+      const availW_unscaled = contentW_px / scale;
+      const availH_unscaled = contentH_px / scale;
+
+      const colChunks = [];
+      if (state.scaleMode === 'fit-width' || state.scaleMode === 'fit-single') {
+        colChunks.push(Array.from({ length: totalCols }, (_, i) => i));
+      } else {
+        let currentCols = [];
+        let accW = 0;
+        for (let c = 0; c < totalCols; c++) {
+          if (accW + colWidths[c] > availW_unscaled && currentCols.length > 0) {
+            colChunks.push(currentCols);
+            currentCols = [c];
+            accW = colWidths[c];
+          } else {
+            currentCols.push(c);
+            accW += colWidths[c];
+          }
+        }
+        if (currentCols.length > 0) colChunks.push(currentCols);
+      }
+
+      const rowChunks = [];
+      if (state.scaleMode === 'fit-single') {
+        rowChunks.push(dataRows);
+      } else {
+        let currentRows = [];
+        let accH = headerH;
+        for (let r = 0; r < dataRows.length; r++) {
+          if (accH + rowH > availH_unscaled && currentRows.length > 0) {
+            rowChunks.push(currentRows);
+            currentRows = [dataRows[r]];
+            accH = (state.repeatHeaders ? headerH : 0) + rowH;
+          } else {
+            currentRows.push(dataRows[r]);
+            accH += rowH;
+          }
+        }
+        if (currentRows.length > 0) rowChunks.push(currentRows);
+      }
+
+      const pages = [];
+      const renderChunk = (rSlice, cIndices, isFirstRowChunk) => {
+        const showHead = isFirstRowChunk || state.repeatHeaders;
+        let html = `<table class="excel-grid-table ${gridClass}" style="width: 100%;">`;
+        if (showHead) {
+          html += `<thead><tr>`;
+          cIndices.forEach(cIdx => {
+            html += `<th>${headerRow[cIdx] ?? ''}</th>`;
+          });
+          html += `</tr></thead>`;
+        }
+        html += `<tbody>`;
+        rSlice.forEach(row => {
+          html += `<tr>`;
+          cIndices.forEach(cIdx => {
+            html += `<td>${row[cIdx] ?? ''}</td>`;
+          });
+          html += `</tr>`;
+        });
+        html += `</tbody></table>`;
+        return { kind: 'html', html, scale };
+      };
+
+      if (state.pageOrder === 'down-then-over') {
+        for (let c = 0; c < colChunks.length; c++) {
+          for (let r = 0; r < rowChunks.length; r++) {
+            pages.push(renderChunk(rowChunks[r], colChunks[c], r === 0));
+          }
+        }
+      } else {
+        for (let r = 0; r < rowChunks.length; r++) {
+          for (let c = 0; c < colChunks.length; c++) {
+            pages.push(renderChunk(rowChunks[r], colChunks[c], r === 0));
+          }
+        }
+      }
+
+      return pages;
+    }
+
+    function paginatePdfContent() {
+      if (!state.pdfJsDoc) return [];
+      const totalSrc = state.pdfJsDoc.numPages;
+      const nup = state.pdfNup;
+      const pages = [];
+
+      for (let i = 1; i <= totalSrc; i += nup) {
+        const group = [];
+        for (let k = 0; k < nup && (i + k) <= totalSrc; k++) {
+          group.push(i + k);
+        }
+        pages.push({
+          kind: 'pdf',
+          srcPageNums: group
+        });
+      }
+      return pages;
+    }
+
+    // =========================================================================
+    // 5. MULTI-PAGE LIVE PREVIEW RENDERER
+    // =========================================================================
+    let renderRequestId = 0;
+
+    async function reflowAndRenderAllPages() {
+      const currentReq = ++renderRequestId;
+      const area = getPrintableAreaMm();
+
+      els.paperBadge.textContent = `${state.paperName} • ${state.orientation === 'portrait' ? 'Portrait' : 'Landscape'} (${area.paperW}×${area.paperH}mm)`;
+
+      let pages = [];
+      if (state.docType === 'docx') {
+        pages = paginateDocxContent(area);
+      } else if (state.docType === 'xlsx') {
+        pages = paginateXlsxContent(area);
+      } else if (state.docType === 'pdf') {
+        pages = paginatePdfContent();
+      }
+
+      state.paginatedPages = pages;
+      const newCount = pages.length;
+
+      let deltaMsg = `${newCount} Page${newCount === 1 ? '' : 's'}`;
+      if (state.previousPageCount > 0 && state.previousPageCount !== newCount) {
+        const diff = newCount - state.previousPageCount;
+        deltaMsg += diff > 0
+          ? ` (+${diff} page${diff > 1 ? 's' : ''} overflowed)`
+          : ` (${Math.abs(diff)} page${Math.abs(diff) > 1 ? 's' : ''} saved)`;
+      } else {
+        deltaMsg += ` • ${area.contentW.toFixed(0)}×${area.contentH.toFixed(0)}mm printable`;
+      }
+      state.previousPageCount = newCount;
+      els.reflowStatusText.textContent = deltaMsg;
+
+      const containerW = Math.max(260, els.pagesScrollContainer.clientWidth - 36);
+      const paperPxW = area.paperW * MM_TO_PX;
+      const paperPxH = area.paperH * MM_TO_PX;
+
+      const baseFitZoom = Math.min(1.0, containerW / paperPxW);
+      const viewZoom = baseFitZoom * state.manualZoomMultiplier;
+      els.zoomLabel.textContent = `${Math.round(viewZoom * 100)}%`;
+
+      els.pageJumpButtons.innerHTML = '';
+      pages.forEach((_, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'px-2.5 py-1 rounded-lg bg-slateCard hover:bg-limeAccent hover:text-slateBg border border-slateBorder text-[11px] font-mono font-semibold text-slate-200 transition shrink-0';
+        btn.textContent = `P.${idx + 1}`;
+        btn.addEventListener('click', () => {
+          const targetEl = document.getElementById(`rendered-sheet-${idx + 1}`);
+          if (targetEl) targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+        els.pageJumpButtons.appendChild(btn);
+      });
+
+      els.pagesScrollContainer.innerHTML = '';
+
+      for (let idx = 0; idx < pages.length; idx++) {
+        if (currentReq !== renderRequestId) return;
+
+        const pageData = pages[idx];
+        const pageNum = idx + 1;
+
+        const wrapper = document.createElement('div');
+        wrapper.id = `rendered-sheet-${pageNum}`;
+        wrapper.className = 'flex flex-col items-center gap-1.5 shrink-0';
+
+        const topLabel = document.createElement('div');
+        topLabel.className = 'w-full flex items-center justify-between text-[11px] font-mono text-slate-400 px-1';
+        topLabel.innerHTML = `
+          <span class="font-bold text-slate-200">Page ${pageNum} of ${newCount}</span>
+          <span>Margins: ${area.top.toFixed(0)}/${area.bottom.toFixed(0)}/${area.left.toFixed(0)}/${area.right.toFixed(0)}mm</span>
+        `;
+        wrapper.appendChild(topLabel);
+
+        const scaledBox = document.createElement('div');
+        scaledBox.style.width = `${paperPxW * viewZoom}px`;
+        scaledBox.style.height = `${paperPxH * viewZoom}px`;
+        scaledBox.style.position = 'relative';
+
+        const sheet = document.createElement('div');
+        sheet.className = 'physical-sheet';
+        sheet.style.width = `${paperPxW}px`;
+        sheet.style.height = `${paperPxH}px`;
+        sheet.style.transform = `scale(${viewZoom})`;
+        sheet.style.transformOrigin = 'top left';
+
+        if (state.headerText.trim() || state.showDateStamp) {
+          const headerDiv = document.createElement('div');
+          headerDiv.style.position = 'absolute';
+          headerDiv.style.top = `${Math.max(8, (area.top * MM_TO_PX) * 0.35)}px`;
+          headerDiv.style.left = `${area.left * MM_TO_PX}px`;
+          headerDiv.style.right = `${area.right * MM_TO_PX}px`;
+          headerDiv.style.display = 'flex';
+          headerDiv.style.justifyContent = 'space-between';
+          headerDiv.style.fontSize = '8.5pt';
+          headerDiv.style.color = '#475569';
+          headerDiv.style.borderBottom = '0.5pt solid #E2E8F0';
+          headerDiv.style.paddingBottom = '2px';
+          headerDiv.innerHTML = `
+            <span>${state.headerText.trim()}</span>
+            <span>${state.showDateStamp ? getTodayFormatted() : ''}</span>
+          `;
+          sheet.appendChild(headerDiv);
+        }
+
+        const contentBox = document.createElement('div');
+        contentBox.style.position = 'absolute';
+        contentBox.style.top = `${area.top * MM_TO_PX}px`;
+        contentBox.style.left = `${area.left * MM_TO_PX}px`;
+        contentBox.style.width = `${area.contentW * MM_TO_PX}px`;
+        contentBox.style.height = `${area.contentH * MM_TO_PX}px`;
+        contentBox.style.overflow = 'hidden';
+
+        if (pageData.kind === 'html') {
+          const inner = document.createElement('div');
+          inner.className = 'doc-flow-content';
+          inner.style.width = `${(area.contentW * MM_TO_PX) / pageData.scale}px`;
+          inner.style.transform = `scale(${pageData.scale})`;
+          inner.innerHTML = pageData.html;
+          contentBox.appendChild(inner);
+        } else if (pageData.kind === 'pdf') {
+          await renderPdfNupIntoBox(contentBox, pageData.srcPageNums, area);
+        }
+
+        sheet.appendChild(contentBox);
+
+        if (state.footerText.trim() || state.showPageNumbers) {
+          const footerDiv = document.createElement('div');
+          footerDiv.style.position = 'absolute';
+          footerDiv.style.bottom = `${Math.max(8, (area.bottom * MM_TO_PX) * 0.32)}px`;
+          footerDiv.style.left = `${area.left * MM_TO_PX}px`;
+          footerDiv.style.right = `${area.right * MM_TO_PX}px`;
+          footerDiv.style.display = 'flex';
+          footerDiv.style.justifyContent = 'space-between';
+          footerDiv.style.fontSize = '8.5pt';
+          footerDiv.style.color = '#475569';
+          footerDiv.style.borderTop = '0.5pt solid #E2E8F0';
+          footerDiv.style.paddingTop = '2px';
+          footerDiv.innerHTML = `
+            <span>${state.footerText.trim()}</span>
+            <span>${state.showPageNumbers ? `Page ${pageNum} of ${newCount}` : ''}</span>
+          `;
+          sheet.appendChild(footerDiv);
+        }
+
+        if (state.showGuides) {
+          const guideBox = document.createElement('div');
+          guideBox.style.position = 'absolute';
+          guideBox.style.top = `${area.top * MM_TO_PX}px`;
+          guideBox.style.left = `${area.left * MM_TO_PX}px`;
+          guideBox.style.width = `${area.contentW * MM_TO_PX}px`;
+          guideBox.style.height = `${area.contentH * MM_TO_PX}px`;
+          guideBox.style.border = '1.5px dashed rgba(56, 189, 248, 0.75)';
+          guideBox.style.pointerEvents = 'none';
+          sheet.appendChild(guideBox);
+        }
+
+        scaledBox.appendChild(sheet);
+        wrapper.appendChild(scaledBox);
+        els.pagesScrollContainer.appendChild(wrapper);
+      }
+    }
+
+    async function renderPdfNupIntoBox(container, srcPageNums, area) {
+      const nup = srcPageNums.length;
+      const cols = nup === 1 ? 1 : 2;
+      const rows = nup <= 2 ? 1 : 2;
+
+      container.style.display = 'grid';
+      container.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+      container.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+      container.style.gap = '8px';
+
+      const cellW = (area.contentW * MM_TO_PX) / cols;
+      const cellH = (area.contentH * MM_TO_PX) / rows;
+      const userScale = state.scaleMode === 'custom' ? (state.customScale / 100) : 1.0;
+
+      for (const pNum of srcPageNums) {
+        const page = await state.pdfJsDoc.getPage(pNum);
+        const rawVp = page.getViewport({ scale: 1 });
+        const fitScale = Math.min(cellW / rawVp.width, cellH / rawVp.height) * userScale;
+        const vp = page.getViewport({ scale: fitScale * 1.5 });
+
+        const canvas = document.createElement('canvas');
+        canvas.width = vp.width;
+        canvas.height = vp.height;
+        canvas.style.maxWidth = `${rawVp.width * fitScale}px`;
+        canvas.style.maxHeight = `${rawVp.height * fitScale}px`;
+        canvas.style.margin = 'auto';
+        canvas.style.display = 'block';
+
+        await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+        container.appendChild(canvas);
+      }
+    }
+
+    // =========================================================================
+    // 6. FILE PARSING (.DOCX, .XLSX, .PDF) & ANDROID JAVASCRIPT BRIDGE
+    // =========================================================================
+    async function waitForGlobal(globalName, timeoutMs = 4500) {
+      if (typeof window[globalName] !== 'undefined') return window[globalName];
+      const start = Date.now();
+      while (Date.now() - start < timeoutMs) {
+        await new Promise(r => setTimeout(r, 150));
+        if (typeof window[globalName] !== 'undefined') return window[globalName];
+      }
+      return undefined;
+    }
+
+    async function handleFileUpload(file) {
+      if (!file) return;
+      const ext = file.name.split('.').pop().toLowerCase();
+      const baseName = file.name.replace(/\.[^/.]+$/, '');
+      state.fileName = baseName;
+      state.previousPageCount = 0;
+      els.activeFileName.textContent = file.name;
+
+      els.loadingOverlay.classList.remove('hidden');
+      els.loadingText.textContent = `Parsing ${file.name}...`;
+
+      try {
+        if (ext === 'docx' || ext === 'doc') {
+          const mammothLib = await waitForGlobal('mammoth');
+          if (!mammothLib) {
+            showToast('Word parser library still loading or offline.');
+            return;
+          }
+          const buffer = await file.arrayBuffer();
+          const result = await mammothLib.convertToHtml({ arrayBuffer: buffer });
+          state.docType = 'docx';
+          state.docxHtml = result.value || '<p>(Empty Word Document)</p>';
+          updateModeVisibility();
+          await reflowAndRenderAllPages();
+          showToast(`Word document reflowed across ${state.paginatedPages.length} pages`);
+        } else if (ext === 'xlsx' || ext === 'xls') {
+          const xlsxLib = await waitForGlobal('XLSX');
+          if (!xlsxLib) {
+            showToast('Excel parser library still loading or offline.');
+            return;
+          }
+          const buffer = await file.arrayBuffer();
+          const wb = xlsxLib.read(buffer, { type: 'array' });
+          const firstSheet = wb.SheetNames[0];
+          const aoa = xlsxLib.utils.sheet_to_json(wb.Sheets[firstSheet], { header: 1, defval: '' });
+          state.docType = 'xlsx';
+          state.xlsxSheetName = firstSheet;
+          state.xlsxRows = aoa.filter(r => r.some(cell => String(cell).trim() !== ''));
+          setOrientation('landscape', false);
+          setScaleMode('fit-width', false);
+          updateModeVisibility();
+          await reflowAndRenderAllPages();
+          showToast(`Excel sheet "${firstSheet}" paginated (${state.paginatedPages.length} pages)`);
+        } else if (ext === 'pdf') {
+          const pdfJs = await waitForGlobal('pdfjsLib');
+          if (!pdfJs) {
+            showToast('PDF viewer library still loading or offline.');
+            return;
+          }
+          ensurePdfJsWorker();
+          const buffer = await file.arrayBuffer();
+          state.docType = 'pdf';
+          state.pdfBytes = new Uint8Array(buffer);
+          state.pdfJsDoc = await pdfJs.getDocument({ data: state.pdfBytes.slice() }).promise;
+          updateModeVisibility();
+          await reflowAndRenderAllPages();
+          showToast(`PDF loaded (${state.pdfJsDoc.numPages} source pages)`);
+        } else {
+          showToast('Please select a .docx, .xlsx, or .pdf file.');
+        }
+      } catch (err) {
+        console.error(err);
+        showToast('Could not read file. Check if it is password-protected.');
+      } finally {
+        els.loadingOverlay.classList.add('hidden');
+      }
+    }
+
+    /**
+     * ANDROID NATIVE BRIDGE RECEIVER:
+     * Called by MainActivity.kt when a file is received via ACTION_VIEW, ACTION_SEND,
+     * or StudioPrintService (Android's native Print dropdown).
+     */
+    window.receiveAndroidFile = async function(fileName, mimeType, base64Data) {
+      try {
+        if (!base64Data) {
+          showToast('Received empty file payload from Android');
+          return;
+        }
+        const cleanBase64 = base64Data.includes(',')
+          ? base64Data.split(',')[1]
+          : base64Data;
+
+        const binaryStr = atob(cleanBase64);
+        const len = binaryStr.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binaryStr.charCodeAt(i);
+        }
+
+        // Ensure fileName has the proper extension for handleFileUpload
+        let resolvedName = (fileName && fileName.trim()) ? fileName.trim() : 'Android_Document';
+        const lowerMime = (mimeType || '').toLowerCase();
+        const hasKnownExt = /\.(pdf|docx|doc|xlsx|xls)$/i.test(resolvedName);
+
+        if (!hasKnownExt) {
+          // Check PDF magic header %PDF
+          const isPdfHeader = len >= 4 &&
+            bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46;
+          if (isPdfHeader || lowerMime.includes('pdf')) {
+            resolvedName += '.pdf';
+          } else if (lowerMime.includes('spreadsheet') || lowerMime.includes('excel') || lowerMime.includes('sheet')) {
+            resolvedName += '.xlsx';
+          } else if (lowerMime.includes('word') || lowerMime.includes('document')) {
+            resolvedName += '.docx';
+          } else {
+            resolvedName += '.pdf';
+          }
+        }
+
+        const resolvedMime = mimeType || 'application/octet-stream';
+        const fileObj = new File([bytes], resolvedName, { type: resolvedMime });
+        await handleFileUpload(fileObj);
+      } catch (err) {
+        console.error('receiveAndroidFile error:', err);
+        showToast('Failed to decode incoming Android file');
+      }
+    };
+
+    function updateModeVisibility() {
+      if (state.docType === 'xlsx') {
+        els.excelOptionsBox.classList.remove('hidden');
+        els.pdfNupBox.classList.add('hidden');
+      } else if (state.docType === 'pdf') {
+        els.excelOptionsBox.classList.add('hidden');
+        els.pdfNupBox.classList.remove('hidden');
+      } else {
+        els.excelOptionsBox.classList.add('hidden');
+        els.pdfNupBox.classList.add('hidden');
+      }
+    }
+
+    // =========================================================================
+    // 7. MULTI-PAGE PRINT-READY PDF EXPORT & ANDROID DOWNLOAD INTERCEPTION
+    // =========================================================================
+    async function buildFinalPdfBlobAndName() {
+      const area = getPrintableAreaMm();
+
+      // Vector assembly for uploaded PDFs
+      if (state.docType === 'pdf' && state.pdfBytes) {
+        const { PDFDocument, StandardFonts, rgb } = PDFLib;
+        const srcDoc = await PDFDocument.load(state.pdfBytes);
+        const outDoc = await PDFDocument.create();
+        const font = await outDoc.embedFont(StandardFonts.Helvetica);
+
+        const pageW_pt = area.paperW * MM_TO_PT;
+        const pageH_pt = area.paperH * MM_TO_PT;
+        const mTop_pt = area.top * MM_TO_PT;
+        const mBottom_pt = area.bottom * MM_TO_PT;
+        const mLeft_pt = area.left * MM_TO_PT;
+        const contentW_pt = area.contentW * MM_TO_PT;
+        const contentH_pt = area.contentH * MM_TO_PT;
+
+        const totalOut = state.paginatedPages.length;
+        const userScale = state.scaleMode === 'custom' ? (state.customScale / 100) : 1.0;
+
+        for (let idx = 0; idx < totalOut; idx++) {
+          const pGroup = state.paginatedPages[idx].srcPageNums;
+          const newPage = outDoc.addPage([pageW_pt, pageH_pt]);
+          const cols = pGroup.length === 1 ? 1 : 2;
+          const rows = pGroup.length <= 2 ? 1 : 2;
+          const cellW = contentW_pt / cols;
+          const cellH = contentH_pt / rows;
+
+          for (let k = 0; k < pGroup.length; k++) {
+            const [emb] = await outDoc.embedPages([srcDoc.getPage(pGroup[k] - 1)]);
+            const fit = Math.min(cellW / emb.width, cellH / emb.height) * userScale;
+            const drawW = emb.width * fit;
+            const drawH = emb.height * fit;
+
+            const colIdx = k % cols;
+            const rowIdx = Math.floor(k / cols);
+            const cellX = mLeft_pt + colIdx * cellW;
+            const cellY = pageH_pt - mTop_pt - (rowIdx + 1) * cellH;
+
+            newPage.drawPage(emb, {
+              x: cellX + (cellW - drawW) / 2,
+              y: cellY + (cellH - drawH) / 2,
+              width: drawW,
+              height: drawH
+            });
+          }
+
+          if (state.showPageNumbers) {
+            const numStr = `Page ${idx + 1} of ${totalOut}`;
+            const tw = font.widthOfTextAtSize(numStr, 8.5);
+            newPage.drawText(numStr, {
+              x: pageW_pt - mLeft_pt - tw,
+              y: Math.max(10, mBottom_pt * 0.4),
+              size: 8.5,
+              font,
+              color: rgb(0.3, 0.35, 0.4)
+            });
+          }
+        }
+
+        const outBytes = await outDoc.save();
+        return {
+          blob: new Blob([outBytes], { type: 'application/pdf' }),
+          fileName: `${state.fileName}_${state.paperName}.pdf`,
+          pageCount: totalOut
+        };
+      }
+
+      // Word (.docx) & Excel (.xlsx) Reflowed Sheets -> jsPDF Blob
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({
+        orientation: state.orientation === 'landscape' ? 'l' : 'p',
+        unit: 'mm',
+        format: [area.paperW, area.paperH]
+      });
+
+      const sheetEls = Array.from(document.querySelectorAll('.physical-sheet'));
+      for (let i = 0; i < sheetEls.length; i++) {
+        els.loadingText.textContent = `Rendering Page ${i + 1} of ${sheetEls.length}...`;
+        const sheetEl = sheetEls[i];
+
+        const prevTransform = sheetEl.style.transform;
+        const guideEl = sheetEl.querySelector('div[style*="dashed"]');
+        if (guideEl) guideEl.style.display = 'none';
+        sheetEl.style.transform = 'none';
+
+        const canvas = await html2canvas(sheetEl, {
+          scale: 2.2,
+          useCORS: true,
+          backgroundColor: '#FFFFFF',
+          width: sheetEl.offsetWidth,
+          height: sheetEl.offsetHeight
+        });
+
+        sheetEl.style.transform = prevTransform;
+        if (guideEl) guideEl.style.display = 'block';
+
+        if (i > 0) pdf.addPage([area.paperW, area.paperH], state.orientation === 'landscape' ? 'l' : 'p');
+        const imgData = canvas.toDataURL('image/jpeg', 0.96);
+        pdf.addImage(imgData, 'JPEG', 0, 0, area.paperW, area.paperH);
+      }
+
+      const outBlob = pdf.output('blob');
+      return {
+        blob: outBlob,
+        fileName: `${state.fileName}_${state.paperName}_PrintReady.pdf`,
+        pageCount: sheetEls.length
+      };
+    }
+
+    async function exportAllPagesToPdf() {
+      els.loadingOverlay.classList.remove('hidden');
+      els.loadingText.textContent = 'Generating multi-page PDF...';
+
+      try {
+        if (state.docType !== 'pdf' && (typeof window.jspdf === 'undefined' || typeof window.html2canvas === 'undefined')) {
+          if (window.AndroidBridge && typeof window.AndroidBridge.printCurrentWebView === 'function') {
+            window.AndroidBridge.printCurrentWebView(state.fileName || 'PrintStudio_Document');
+            showToast('Offline mode: Select "Save as PDF" in Android Print dialog.');
+            return;
+          }
+          window.print();
+          return;
+        }
+        const { blob, fileName, pageCount } = await buildFinalPdfBlobAndName();
+        triggerDownload(blob, fileName);
+        showToast(`Exported ${pageCount}-page Print-Ready PDF!`);
+      } catch (err) {
+        console.error(err);
+        showToast('Export encountered an error. Try reducing zoom.');
+      } finally {
+        els.loadingOverlay.classList.add('hidden');
+      }
+    }
+
+    async function sendReflowedPdfToAndroidPrinter() {
+      els.loadingOverlay.classList.remove('hidden');
+      els.loadingText.textContent = 'Preparing print spool...';
+
+      try {
+        if (state.docType !== 'pdf' && (typeof window.jspdf === 'undefined' || typeof window.html2canvas === 'undefined')) {
+          if (window.AndroidBridge && typeof window.AndroidBridge.printCurrentWebView === 'function') {
+            window.AndroidBridge.printCurrentWebView(state.fileName || 'PrintStudio_Document');
+            showToast('Opening Android System Print Dialog...');
+            return;
+          }
+          window.print();
+          return;
+        }
+        const { blob, fileName } = await buildFinalPdfBlobAndName();
+        if (window.AndroidBridge && typeof window.AndroidBridge.printPdf === 'function') {
+          const reader = new FileReader();
+          reader.onloadend = function() {
+            window.AndroidBridge.printPdf(reader.result, fileName);
+          };
+          reader.readAsDataURL(blob);
+          showToast('Opening Android System Print Dialog...');
+        } else {
+          window.print();
+        }
+      } catch (err) {
+        console.error(err);
+        showToast('Could not open system print dialog.');
+      } finally {
+        els.loadingOverlay.classList.add('hidden');
+      }
+    }
+
+    function triggerDownload(blob, filename) {
+      // Create standard blob: URL and trigger anchor download so WebView's DownloadListener
+      // or direct AndroidBridge interceptor can save it to public Downloads via MediaStore
+      if (window.AndroidBridge && typeof window.AndroidBridge.saveBlobPdf === 'function') {
+        const reader = new FileReader();
+        reader.onloadend = function() {
+          window.AndroidBridge.saveBlobPdf(reader.result, filename, blob.type || 'application/pdf');
+        };
+        reader.readAsDataURL(blob);
+        return;
+      }
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+    }
+
+    // =========================================================================
+    // 8. UI CONTROL BINDINGS & INTERACTIVITY
+    // =========================================================================
+    function syncMarginInputsFromState() {
+      const factor = state.unit === 'mm' ? 1 : (1 / IN_TO_MM);
+      const step = state.unit === 'mm' ? '0.5' : '0.05';
+      const max = state.unit === 'mm' ? '90' : '3.5';
+
+      ['top', 'bottom', 'left', 'right'].forEach(side => {
+        const cap = side.charAt(0).toUpperCase() + side.slice(1);
+        const input = document.getElementById(`margin${cap}Input`);
+        const slider = document.getElementById(`margin${cap}Slider`);
+        const val = (state.marginsMm[side] * factor).toFixed(state.unit === 'mm' ? 1 : 2);
+
+        input.step = step;
+        slider.step = step;
+        slider.max = max;
+        input.value = val;
+        slider.value = val;
+      });
+
+      document.querySelectorAll('.unit-label').forEach(el => {
+        el.textContent = state.unit;
+      });
+    }
+
+    function updateMarginSide(side, rawVal) {
+      const num = Math.max(0, parseFloat(rawVal) || 0);
+      const mmVal = state.unit === 'mm' ? num : num * IN_TO_MM;
+
+      if (state.linkMargins) {
+        state.marginsMm.top = mmVal;
+        state.marginsMm.bottom = mmVal;
+        state.marginsMm.left = mmVal;
+        state.marginsMm.right = mmVal;
+      } else {
+        state.marginsMm[side] = mmVal;
+      }
+
+      document.querySelectorAll('.margin-preset-btn').forEach(b => {
+        b.className = 'margin-preset-btn p-2 rounded-xl border border-slateBorder bg-slateBg/60 text-center transition';
+      });
+
+      syncMarginInputsFromState();
+      reflowAndRenderAllPages();
+    }
+
+    function setOrientation(orient, rerender = true) {
+      state.orientation = orient;
+      document.querySelectorAll('.orient-btn').forEach(btn => {
+        const active = btn.dataset.orient === orient;
+        btn.className = active
+          ? 'orient-btn active-orient flex items-center justify-center gap-2 py-3 px-4 rounded-xl border-2 border-limeAccent bg-limeAccent/10 text-white font-semibold text-xs transition'
+          : 'orient-btn flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-slateBorder bg-slateBg/60 text-slate-400 hover:text-white font-semibold text-xs transition';
+      });
+      if (rerender) reflowAndRenderAllPages();
+    }
+
+    function setScaleMode(mode, rerender = true) {
+      state.scaleMode = mode;
+      document.querySelectorAll('.scale-mode-btn').forEach(btn => {
+        const active = btn.dataset.scaleMode === mode;
+        btn.className = active
+          ? 'scale-mode-btn active-scale p-2.5 rounded-xl border-2 border-limeAccent bg-limeAccent/10 text-left flex items-center justify-between transition'
+          : 'scale-mode-btn p-2.5 rounded-xl border border-slateBorder bg-slateBg/60 hover:border-slate-500 text-left flex items-center justify-between transition';
+      });
+
+      const customBox = document.getElementById('customScaleBox');
+      if (mode === 'custom') {
+        customBox.classList.remove('opacity-40', 'pointer-events-none');
+      } else {
+        customBox.classList.add('opacity-40', 'pointer-events-none');
+      }
+      if (rerender) reflowAndRenderAllPages();
+    }
+
+    // Tab switching
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const target = btn.dataset.tab;
+        document.querySelectorAll('.tab-btn').forEach(b => {
+          b.className = 'tab-btn py-2 px-2 rounded-xl text-xs font-semibold flex flex-col sm:flex-row items-center justify-center gap-1 transition text-slate-400 hover:text-white hover:bg-slateHover';
+        });
+        btn.className = 'tab-btn active-tab py-2 px-2 rounded-xl text-xs font-bold flex flex-col sm:flex-row items-center justify-center gap-1 transition bg-limeAccent text-slateBg';
+
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+        document.getElementById(`tab-${target}`).classList.remove('hidden');
+      });
+    });
+
+    // Margin presets & sliders
+    document.querySelectorAll('.margin-preset-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const preset = MARGIN_PRESETS[btn.dataset.marginPreset];
+        if (!preset) return;
+        state.marginsMm = { ...preset };
+        document.querySelectorAll('.margin-preset-btn').forEach(b => {
+          b.className = 'margin-preset-btn p-2 rounded-xl border border-slateBorder bg-slateBg/60 text-center transition';
+        });
+        btn.className = 'margin-preset-btn p-2 rounded-xl border-2 border-limeAccent bg-limeAccent/10 text-center transition';
+        syncMarginInputsFromState();
+        reflowAndRenderAllPages();
+      });
+    });
+
+    document.querySelectorAll('.unit-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.unit = btn.dataset.unit;
+        document.querySelectorAll('.unit-btn').forEach(b => {
+          b.className = b.dataset.unit === state.unit
+            ? 'unit-btn px-2.5 py-1 rounded-md bg-limeAccent text-slateBg font-bold'
+            : 'unit-btn px-2.5 py-1 rounded-md text-slate-400 hover:text-white';
+        });
+        syncMarginInputsFromState();
+      });
+    });
+
+    document.getElementById('linkMarginsBtn').addEventListener('click', () => {
+      state.linkMargins = !state.linkMargins;
+      const label = document.getElementById('linkLabel');
+      label.textContent = state.linkMargins ? 'Link: ON' : 'Link: OFF';
+      label.classList.toggle('text-limeAccent', state.linkMargins);
+      if (state.linkMargins) {
+        updateMarginSide('top', document.getElementById('marginTopInput').value);
+      }
+    });
+
+    ['top', 'bottom', 'left', 'right'].forEach(side => {
+      const cap = side.charAt(0).toUpperCase() + side.slice(1);
+      const input = document.getElementById(`margin${cap}Input`);
+      const slider = document.getElementById(`margin${cap}Slider`);
+      input.addEventListener('input', () => updateMarginSide(side, input.value));
+      slider.addEventListener('input', () => updateMarginSide(side, slider.value));
+    });
+
+    // Paper & Orientation
+    document.querySelectorAll('.orient-btn').forEach(btn => {
+      btn.addEventListener('click', () => setOrientation(btn.dataset.orient));
+    });
+
+    document.querySelectorAll('.paper-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const key = btn.dataset.paper;
+        const dims = PAPER_PRESETS[key];
+        if (!dims) return;
+        state.paperName = key;
+        state.paperWidthMm = dims.w;
+        state.paperHeightMm = dims.h;
+
+        document.querySelectorAll('.paper-btn').forEach(b => {
+          b.className = 'paper-btn p-2.5 rounded-xl border border-slateBorder bg-slateBg/60 hover:border-slate-500 text-left transition';
+          b.querySelector('div:last-child').className = 'text-[10px] font-mono text-slate-400';
+        });
+        btn.className = 'paper-btn active-paper p-2.5 rounded-xl border-2 border-limeAccent bg-limeAccent/10 text-left transition';
+        btn.querySelector('div:last-child').className = 'text-[10px] font-mono text-limeAccent';
+
+        reflowAndRenderAllPages();
+      });
+    });
+
+    // Scaling & Layout Controls
+    document.querySelectorAll('.scale-mode-btn').forEach(btn => {
+      btn.addEventListener('click', () => setScaleMode(btn.dataset.scaleMode));
+    });
+
+    document.getElementById('customScaleSlider').addEventListener('input', (e) => {
+      state.customScale = parseInt(e.target.value, 10);
+      document.getElementById('customScaleText').textContent = `${state.customScale}%`;
+      document.getElementById('customScaleBadge').textContent = `${state.customScale}%`;
+      reflowAndRenderAllPages();
+    });
+
+    document.getElementById('repeatHeadersToggle').addEventListener('change', (e) => {
+      state.repeatHeaders = e.target.checked;
+      reflowAndRenderAllPages();
+    });
+
+    document.getElementById('excelGridlinesToggle').addEventListener('change', (e) => {
+      state.excelGridlines = e.target.checked;
+      reflowAndRenderAllPages();
+    });
+
+    document.querySelectorAll('.page-order-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.pageOrder = btn.dataset.pageOrder;
+        document.querySelectorAll('.page-order-btn').forEach(b => {
+          b.className = b.dataset.pageOrder === state.pageOrder
+            ? 'page-order-btn py-2 px-2.5 rounded-xl border-2 border-limeAccent bg-limeAccent/10 text-[11px] font-semibold text-white'
+            : 'page-order-btn py-2 px-2.5 rounded-xl border border-slateBorder bg-slateBg/60 text-[11px] font-semibold text-slate-400';
+        });
+        reflowAndRenderAllPages();
+      });
+    });
+
+    document.querySelectorAll('.nup-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.pdfNup = parseInt(btn.dataset.nup, 10);
+        document.querySelectorAll('.nup-btn').forEach(b => {
+          b.className = parseInt(b.dataset.nup, 10) === state.pdfNup
+            ? 'nup-btn py-2 rounded-xl border-2 border-limeAccent bg-limeAccent/10 text-xs font-bold text-white'
+            : 'nup-btn py-2 rounded-xl border border-slateBorder bg-slateBg/60 text-xs font-semibold text-slate-300';
+        });
+        reflowAndRenderAllPages();
+      });
+    });
+
+    // Headers & Footers
+    document.getElementById('headerTextInput').addEventListener('input', (e) => {
+      state.headerText = e.target.value;
+      reflowAndRenderAllPages();
+    });
+    document.getElementById('footerTextInput').addEventListener('input', (e) => {
+      state.footerText = e.target.value;
+      reflowAndRenderAllPages();
+    });
+    document.getElementById('pageNumbersToggle').addEventListener('change', (e) => {
+      state.showPageNumbers = e.target.checked;
+      reflowAndRenderAllPages();
+    });
+    document.getElementById('dateStampToggle').addEventListener('change', (e) => {
+      state.showDateStamp = e.target.checked;
+      reflowAndRenderAllPages();
+    });
+
+    // Top Toolbar Controls
+    els.fileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) handleFileUpload(e.target.files[0]);
+    });
+    els.exportBtn.addEventListener('click', exportAllPagesToPdf);
+    els.systemPrintBtn.addEventListener('click', sendReflowedPdfToAndroidPrinter);
+
+    els.toggleGuidesBtn.addEventListener('click', () => {
+      state.showGuides = !state.showGuides;
+      els.toggleGuidesBtn.textContent = `Guides: ${state.showGuides ? 'ON' : 'OFF'}`;
+      reflowAndRenderAllPages();
+    });
+
+    els.zoomInBtn.addEventListener('click', () => {
+      state.manualZoomMultiplier = Math.min(2.0, +(state.manualZoomMultiplier + 0.15).toFixed(2));
+      reflowAndRenderAllPages();
+    });
+    els.zoomOutBtn.addEventListener('click', () => {
+      state.manualZoomMultiplier = Math.max(0.6, +(state.manualZoomMultiplier - 0.15).toFixed(2));
+      reflowAndRenderAllPages();
+    });
+
+    // Sample Switchers
+    function loadBuiltInSample(type) {
+      state.previousPageCount = 0;
+      if (type === 'docx') {
+        state.docType = 'docx';
+        state.activeSample = 'docx';
+        state.fileName = 'Office_Administrative_Circular';
+        state.docxHtml = SAMPLE_DOCX_HTML;
+        els.activeFileName.textContent = 'Sample: Office_Administrative_Circular.docx';
+        setOrientation('portrait', false);
+        setScaleMode('custom', false);
+        document.getElementById('sampleDocxBtn').className = 'px-2.5 py-1.5 rounded-lg bg-slateHover text-limeAccent transition';
+        document.getElementById('sampleXlsxBtn').className = 'px-2.5 py-1.5 rounded-lg text-slate-300 hover:text-white transition';
+      } else {
+        state.docType = 'xlsx';
+        state.activeSample = 'xlsx';
+        state.fileName = 'Annual_Student_Marks_Ledger';
+        state.xlsxRows = generateSampleXlsxRows();
+        els.activeFileName.textContent = 'Sample: Annual_Student_Marks_Ledger.xlsx';
+        setOrientation('landscape', false);
+        setScaleMode('fit-width', false);
+        document.getElementById('sampleXlsxBtn').className = 'px-2.5 py-1.5 rounded-lg bg-slateHover text-limeAccent transition';
+        document.getElementById('sampleDocxBtn').className = 'px-2.5 py-1.5 rounded-lg text-slate-300 hover:text-white transition';
+      }
+      updateModeVisibility();
+      reflowAndRenderAllPages();
+    }
+
+    document.getElementById('sampleDocxBtn').addEventListener('click', () => loadBuiltInSample('docx'));
+    document.getElementById('sampleXlsxBtn').addEventListener('click', () => loadBuiltInSample('xlsx'));
+    document.getElementById('mobileSampleToggleBtn').addEventListener('click', () => {
+      loadBuiltInSample(state.activeSample === 'docx' ? 'xlsx' : 'docx');
+    });
+
+    window.addEventListener('resize', () => {
+      reflowAndRenderAllPages();
+    });
+
+    document.getElementById('openFileBtn').addEventListener('click', () => {
+      if (window.AndroidBridge && typeof window.AndroidBridge.openNativeFilePicker === 'function') {
+        window.AndroidBridge.openNativeFilePicker();
+      } else {
+        els.fileInput.click();
+      }
+    });
+
+    const printSettingsBtn = document.getElementById('printSettingsBtn');
+    if (window.AndroidBridge && typeof window.AndroidBridge.openSystemPrintSettings === 'function') {
+      printSettingsBtn.classList.remove('hidden');
+      printSettingsBtn.classList.add('flex');
+      printSettingsBtn.addEventListener('click', () => {
+        window.AndroidBridge.openSystemPrintSettings();
+      });
+    }
+
+    // Initialize immediately with the multi-page Word Circular sample,
+    // and notify AndroidBridge that the DOM and window.receiveAndroidFile are ready.
+    function initializePrintStudio() {
+      try {
+        ensurePdfJsWorker();
+        loadBuiltInSample('docx');
+      } catch (err) {
+        console.error('Initialization error:', err);
+      }
+      if (window.AndroidBridge && typeof window.AndroidBridge.onWebAppReady === 'function') {
+        window.AndroidBridge.onWebAppReady();
+      }
+    }
+
+    if (document.readyState === 'loading') {
+      window.addEventListener('DOMContentLoaded', initializePrintStudio);
+    } else {
+      initializePrintStudio();
+    }
+  </script>
+</body>
+</html>

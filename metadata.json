@@ -1,0 +1,6 @@
+{
+  "name": "PrintStudio Pro",
+  "description": "Desktop-grade PDF, Word (.docx), and Excel (.xlsx) page reflow, custom margin controller, and virtual Android PrintService.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

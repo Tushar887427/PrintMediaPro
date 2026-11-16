@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+
+    <application
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:usesCleartextTraffic="true"
+        android:theme="@style/Theme.MyApplication">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.MyApplication">
+
+            <!-- Primary App Launcher -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Open With (ACTION_VIEW) by MIME type for PDF, Word, Excel -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:mimeType="application/pdf" />
+                <data android:mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+                <data android:mimeType="application/msword" />
+                <data android:mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.template" />
+                <data android:mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+                <data android:mimeType="application/vnd.ms-excel" />
+                <data android:mimeType="application/vnd.ms-excel.sheet.macroEnabled.12" />
+                <data android:mimeType="text/csv" />
+                <data android:mimeType="text/comma-separated-values" />
+                <data android:mimeType="application/octet-stream" />
+            </intent-filter>
+
+            <!-- Open With (ACTION_VIEW) by file extension when File Managers omit MIME type -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="file" />
+                <data android:scheme="content" />
+                <data android:host="*" />
+                <data android:pathPattern=".*\\.pdf" />
+                <data android:pathPattern=".*\\.PDF" />
+                <data android:pathPattern=".*\\.docx" />
+                <data android:pathPattern=".*\\.DOCX" />
+                <data android:pathPattern=".*\\.doc" />
+                <data android:pathPattern=".*\\.DOC" />
+                <data android:pathPattern=".*\\.xlsx" />
+                <data android:pathPattern=".*\\.XLSX" />
+                <data android:pathPattern=".*\\.xls" />
+                <data android:pathPattern=".*\\.XLS" />
+            </intent-filter>
+
+            <!-- Share Menu (ACTION_SEND) for PDF, Word (.docx/.doc), and Excel (.xlsx/.xls) -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/pdf" />
+                <data android:mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+                <data android:mimeType="application/msword" />
+                <data android:mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.template" />
+                <data android:mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+                <data android:mimeType="application/vnd.ms-excel" />
+                <data android:mimeType="application/vnd.ms-excel.sheet.macroEnabled.12" />
+                <data android:mimeType="text/csv" />
+                <data android:mimeType="text/comma-separated-values" />
+                <data android:mimeType="application/octet-stream" />
+            </intent-filter>
+        </activity>
+
+        <!-- Native Android PrintService: Appears as 'PrintStudio Pro' in Android's System Print Dropdown -->
+        <service
+            android:name=".StudioPrintService"
+            android:label="@string/print_service_label"
+            android:description="@string/print_service_description"
+            android:permission="android.permission.BIND_PRINT_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.printservice.PrintService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.printservice"
+                android:resource="@xml/printservice" />
+        </service>
+
+        <!-- FileProvider to safely grant content:// URI read access for spooled PDFs -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+    </application>
+
+</manifest>

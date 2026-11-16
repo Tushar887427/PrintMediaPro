@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">PrintStudio Pro</string>
+    <string name="print_service_label">PrintStudio Pro</string>
+    <string name="print_service_description">Reflow pages, adjust margins, and export print-ready PDFs</string>
+    <string name="virtual_printer_name">PrintStudio Pro (Margin &amp; Reflow Studio)</string>
+    <string name="virtual_printer_description">Open document in PrintStudio Pro to customize margins, scaling, and page layout</string>
+</resources>
