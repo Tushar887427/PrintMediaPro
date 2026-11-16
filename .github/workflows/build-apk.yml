@@ -1,0 +1,139 @@
+name: Build APK
+
+# Builds an installable debug APK on every push (and on demand from the
+# Actions tab), then publishes it under the repository's Releases page.
+on:
+  push:
+    branches: ["**"]
+    paths-ignore:
+      - "**.md"
+  workflow_dispatch:
+
+permissions:
+  contents: write # needed to publish the APK as a release asset
+
+concurrency:
+  group: build-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Assemble debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      # The repository ships gradle-wrapper.properties but not the wrapper
+      # script/jar, so install the exact Gradle version it asks for.
+      - name: Read Gradle version
+        id: gradle
+        run: |
+          version="$(grep -oP 'gradle-\K[0-9.]+(?=-(bin|all)\.zip)' gradle/wrapper/gradle-wrapper.properties)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Gradle ${{ steps.gradle.outputs.version }}
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: ${{ steps.gradle.outputs.version }}
+          cache-provider: basic
+
+      - name: Accept Android SDK licenses
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+
+      # app/build.gradle.kts signs debug builds with <root>/debug.keystore, which
+      # is git-ignored. Restore it from the DEBUG_KEYSTORE_BASE64 secret so every
+      # build carries the same signature (required to install an update over an
+      # older build). Without the secret a throw-away keystore is generated.
+      - name: Prepare debug keystore
+        env:
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          if [ -f debug.keystore ]; then
+            echo "Using debug.keystore from the repository."
+          elif [ -n "$DEBUG_KEYSTORE_BASE64" ]; then
+            echo "$DEBUG_KEYSTORE_BASE64" | base64 --decode > debug.keystore
+            echo "Restored debug.keystore from the DEBUG_KEYSTORE_BASE64 secret."
+          else
+            keytool -genkeypair -keystore debug.keystore -storetype PKCS12 \
+              -storepass android -keypass android -alias androiddebugkey \
+              -keyalg RSA -keysize 2048 -validity 10950 \
+              -dname "CN=Android Debug,O=Android,C=US"
+            echo "::warning::DEBUG_KEYSTORE_BASE64 secret is not set - this APK is signed with a one-off key and cannot be installed as an update over earlier builds."
+          fi
+
+      - name: Build debug APK
+        id: assemble
+        run: |
+          set -o pipefail
+          gradle assembleDebug 2>&1 | tee build.log
+
+      # Surface compiler / Gradle errors as annotations on the run page.
+      - name: Report build errors
+        if: failure() && steps.assemble.outcome == 'failure'
+        run: |
+          grep -E '^e: file://' build.log | sort -u | head -n 9 | while IFS= read -r line; do
+            path="$(sed -E 's#^e: file://([^ ]+):([0-9]+):([0-9]+) .*#\1#' <<< "$line")"
+            row="$(sed -E 's#^e: file://([^ ]+):([0-9]+):([0-9]+) .*#\2#' <<< "$line")"
+            col="$(sed -E 's#^e: file://([^ ]+):([0-9]+):([0-9]+) .*#\3#' <<< "$line")"
+            msg="$(sed -E 's#^e: file://[^ ]+:[0-9]+:[0-9]+ ##' <<< "$line")"
+            echo "::error file=${path#"$GITHUB_WORKSPACE"/},line=$row,col=$col::$msg"
+          done
+          reason="$(sed -n '/^\* What went wrong:/,/^\* Try:/p' build.log | sed '$d' | head -n 40)"
+          if [ -z "$reason" ]; then reason="$(tail -n 40 build.log)"; fi
+          {
+            echo "### Build failed"
+            echo '```'
+            echo "$reason"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          reason="${reason//'%'/'%25'}"
+          reason="${reason//$'\r'/'%0D'}"
+          reason="${reason//$'\n'/'%0A'}"
+          echo "::error title=Gradle build failed::$reason"
+
+      - name: Collect APK
+        id: apk
+        run: |
+          src="$(find app/build/outputs/apk/debug -name '*.apk' | head -n 1)"
+          if [ -z "$src" ]; then
+            echo "::error::Gradle finished but no APK was produced."
+            exit 1
+          fi
+          name="PrintStudioPro-debug-build${{ github.run_number }}.apk"
+          mkdir -p dist
+          cp "$src" "dist/$name"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "path=dist/$name" >> "$GITHUB_OUTPUT"
+          ls -l dist
+          sha256sum "dist/$name"
+
+      - name: Upload APK as workflow artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: PrintStudioPro-debug-apk
+          path: ${{ steps.apk.outputs.path }}
+          if-no-files-found: error
+
+      - name: Publish APK to Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: build-${{ github.run_number }}
+          APK: ${{ steps.apk.outputs.path }}
+        run: |
+          gh release create "$TAG" "$APK" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "PrintStudio Pro - debug build #${{ github.run_number }}" \
+            --notes "Debug APK built from \`${GITHUB_SHA::7}\` on \`${GITHUB_REF_NAME}\`. Download the \`.apk\` below and open it on an Android 8.0+ device to install." \
+            --prerelease
+          echo "### APK ready" >> "$GITHUB_STEP_SUMMARY"
+          echo "https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/${{ steps.apk.outputs.name }}" >> "$GITHUB_STEP_SUMMARY"
